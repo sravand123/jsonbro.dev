@@ -324,13 +324,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       <header className="border-b bg-card/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-center">
-            <div className="flex items-center space-x-3">
-              <FileText className="h-8 w-8 text-primary" />
               <div className="text-center">
-                <h1 className="text-2xl font-bold">JsonBro</h1>
-                <p className="text-sm text-muted-foreground">Prettify JSON like a pro, bro</p>
+                <h1 className="text-2xl font-bold">🧩JsonBro.Dev</h1>
+                <p className="text-sm text-muted-foreground">Handle JSON like a pro, bro!!</p>
               </div>
-            </div>
           </div>
         </div>
       </header>
@@ -341,34 +338,6 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         {/* Main Editor Area - Improved Layout */}
         <div>
           <div className="w-full max-w-[85%] mx-auto">
-            {/* Action Buttons - Aligned with Editor */}
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="h-9"
-              >
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-              
-              <Button
-                variant={viewMode === 'formatted' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('formatted')}
-              >
-                Editor
-              </Button>
-              
-              <Button
-                variant={viewMode === 'tree' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('tree')}
-              >
-                Tree View
-              </Button>
-            </div>
-
             {/* Main Action Buttons - Aligned with Editor */}
             <div className="flex items-center justify-center flex-wrap gap-3 mb-4">
               <Button 
@@ -511,13 +480,34 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                     </span>
                   )}
                 </div>
+                 {/* Action Buttons - Aligned with Editor */}
               </div>
+            <div className="flex items-center justify-end space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="h-9"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
               
-              {viewMode === 'tree' && parsedData && validationStatus === 'valid' && (
-                <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-                  {Array.isArray(parsedData) ? `${parsedData.length} items` : `${Object.keys(parsedData || {}).length} properties`}
-                </div>
-              )}
+              <Button
+                variant={viewMode === 'formatted' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('formatted')}
+              >
+                Editor
+              </Button>
+              
+              <Button
+                variant={viewMode === 'tree' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('tree')}
+              >
+                Tree View
+              </Button>
+            </div>
             </div>
             
             <div
