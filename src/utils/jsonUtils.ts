@@ -1,0 +1,325 @@
+export interface JSONError {
+  message: string;
+  line?: number;
+  column?: number;
+  position?: number;
+}
+
+export interface JSONNode {
+  key?: string;
+  value: any;
+  type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null';
+  path: string;
+}
+
+/**
+ * Parse JSON and return error information if invalid
+ */
+export function parseJSONSafe(jsonString: string): { data: any; error: JSONError | null } {
+  try {
+    const data = JSON.parse(jsonString);
+    return { data, error: null };
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      const message = error.message;
+      const line = extractLineNumber(message);
+      const column = extractColumnNumber(message);
+      
+      return {
+        data: null,
+        error: {
+          message,
+          line,
+          column,
+          position: calculatePosition(jsonString, line, column)
+        }
+      };
+    }
+    return {
+      data: null,
+      error: {
+        message: 'Unknown parsing error'
+      }
+    };
+  }
+}
+
+/**
+ * Format JSON with proper indentation
+ */
+export function formatJSON(data: any, indent: number = 2): string {
+  try {
+    return JSON.stringify(data, null, indent);
+  } catch (error) {
+    throw new Error('Cannot format: ' + (error as Error).message);
+  }
+}
+
+/**
+ * Minify JSON by removing whitespace
+ */
+export function minifyJSON(data: any): string {
+  try {
+    return JSON.stringify(data);
+  } catch (error) {
+    throw new Error('Cannot minify: ' + (error as Error).message);
+  }
+}
+
+/**
+ * Convert JSON to a tree structure for collapsible display
+ */
+export function convertToTree(data: any, path: string = ''): JSONNode[] {
+  const nodes: JSONNode[] = [];
+
+  if (data === null) {
+    nodes.push({
+      value: null,
+      type: 'null',
+      path: path || 'root'
+    });
+    return nodes;
+  }
+
+  if (typeof data === 'string') {
+    nodes.push({
+      value: data,
+      type: 'string',
+      path: path || 'root'
+    });
+    return nodes;
+  }
+
+  if (typeof data === 'number') {
+    nodes.push({
+      value: data,
+      type: 'number',
+      path: path || 'root'
+    });
+    return nodes;
+  }
+
+  if (typeof data === 'boolean') {
+    nodes.push({
+      value: data,
+      type: 'boolean',
+      path: path || 'root'
+    });
+    return nodes;
+  }
+
+  if (Array.isArray(data)) {
+    nodes.push({
+      value: data,
+      type: 'array',
+      path: path || 'root'
+    });
+    
+    data.forEach((item, index) => {
+      nodes.push(...convertToTree(item, `${path}[${index}]`));
+    });
+    return nodes;
+  }
+
+  if (typeof data === 'object') {
+    nodes.push({
+      value: data,
+      type: 'object',
+      path: path || 'root'
+    });
+
+    Object.keys(data).forEach(key => {
+      nodes.push(...convertToTree(data[key], `${path}.${key}`));
+    });
+    return nodes;
+  }
+
+  return nodes;
+}
+
+/**
+ * Search through JSON data
+ */
+export function searchJSON(data: any, searchTerm: string): JSONNode[] {
+  const results: JSONNode[] = [];
+  const searchLower = searchTerm.toLowerCase();
+
+  function searchRecursive(obj: any, path: string) {
+    if (obj === null) return;
+    
+    if (typeof obj === 'string' && obj.toLowerCase().includes(searchLower)) {
+      results.push({
+        value: obj,
+        type: 'string',
+        path
+      });
+    } else if (typeof obj === 'number' && obj.toString().includes(searchTerm)) {
+      results.push({
+        value: obj,
+        type: 'number',
+        path
+      });
+    } else if (typeof obj === 'boolean') {
+      const boolStr = obj.toString();
+      if (boolStr.toLowerCase().includes(searchLower)) {
+        results.push({
+          value: obj,
+          type: 'boolean',
+          path
+        });
+      }
+    } else if (Array.isArray(obj)) {
+      obj.forEach((item, index) => {
+        searchRecursive(item, `${path}[${index}]`);
+      });
+    } else if (typeof obj === 'object') {
+      Object.keys(obj).forEach(key => {
+        if (key.toLowerCase().includes(searchLower)) {
+          results.push({
+            key,
+            value: obj[key],
+            type: 'object',
+            path: `${path}.${key}`
+          });
+        }
+        searchRecursive(obj[key], `${path}.${key}`);
+      });
+    }
+  }
+
+  searchRecursive(data, 'root');
+  return results;
+}
+
+/**
+ * Extract line number from JSON error message
+ */
+function extractLineNumber(message: string): number | undefined {
+  const match = message.match(/line (\d+)/i);
+  return match ? parseInt(match[1], 10) : undefined;
+}
+
+/**
+ * Extract column number from JSON error message
+ */
+function extractColumnNumber(message: string): number | undefined {
+  const match = message.match(/column (\d+)/i);
+  return match ? parseInt(match[1], 10) : undefined;
+}
+
+/**
+ * Calculate character position in string
+ */
+function calculatePosition(text: string, line?: number, column?: number): number {
+  if (!line || !column) return 0;
+  
+  const lines = text.split('\n');
+  let position = 0;
+  
+  for (let i = 0; i < line - 1 && i < lines.length; i++) {
+    position += lines[i].length + 1; // +1 for newline character
+  }
+  
+  return position + Math.max(0, column - 1);
+}
+
+/**
+ * Copy text to clipboard
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    // Fallback for older browsers
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return success;
+    } catch (fallbackError) {
+      console.error('Failed to copy to clipboard:', fallbackError);
+      return false;
+    }
+  }
+}
+
+/**
+ * Download JSON as file
+ */
+export function downloadJSON(data: any, filename: string = 'formatted.json') {
+  try {
+    const jsonString = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Failed to download file:', error);
+  }
+}
+
+/**
+ * Validate and parse file content
+ */
+export async function parseJSONFile(file: File): Promise<{ data: any; error: JSONError | null }> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) {
+        resolve({
+          data: null,
+          error: { message: 'File appears to be empty' }
+        });
+        return;
+      }
+      
+      const result = parseJSONSafe(content);
+      resolve(result);
+    };
+    
+    reader.onerror = () => {
+      resolve({
+        data: null,
+        error: { message: 'Failed to read file' }
+      });
+    };
+    
+    reader.readAsText(file);
+  });
+}
+
+/**
+ * Get keyboard shortcuts
+ */
+export const KEYBOARD_SHORTCUTS = {
+  FORMAT: { ctrl: true, key: 'f', description: 'Format JSON' },
+  MINIFY: { ctrl: true, key: 'm', description: 'Minify JSON' },
+  COPY: { ctrl: true, key: 'c', description: 'Copy to clipboard' },
+  CLEAR: { ctrl: true, key: 'k', description: 'Clear input' },
+  SEARCH: { ctrl: true, key: 'h', description: 'Focus search' },
+  SAVE: { ctrl: true, key: 's', description: 'Download JSON' }
+} as const;
+
+/**
+ * Check if keyboard shortcut matches
+ */
+export function isShortcut(event: KeyboardEvent, shortcut: typeof KEYBOARD_SHORTCUTS[keyof typeof KEYBOARD_SHORTCUTS]): boolean {
+  return (
+    event.ctrlKey === shortcut.ctrl &&
+    event.key.toLowerCase() === shortcut.key
+  );
+}

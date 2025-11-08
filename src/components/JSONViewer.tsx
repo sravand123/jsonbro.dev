@@ -1,0 +1,609 @@
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { 
+  Download, 
+  Upload, 
+  Copy, 
+  Trash2, 
+  Search, 
+  Moon, 
+  Sun, 
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  parseJSONSafe, 
+  formatJSON, 
+  minifyJSON, 
+  copyToClipboard, 
+  downloadJSON, 
+  parseJSONFile,
+  searchJSON,
+  KEYBOARD_SHORTCUTS,
+  isShortcut,
+  type JSONNode 
+} from '../utils/jsonUtils';
+import { MonacoJSONEditor } from './MonacoJSONEditor';
+import ReactJson from 'react-json-view';
+
+interface JSONViewerProps {
+  theme?: string;
+  setTheme?: (theme: string) => void;
+}
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) {
+  const [input, setInput] = useState('');
+  const [error, setError] = useState<{ message: string; line?: number; column?: number; position?: number } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<JSONNode[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [viewMode, setViewMode] = useState<'formatted' | 'tree'>('formatted');
+  const [isFormatting, setIsFormatting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<any>(null);
+
+  // Passive validation - only for status indicators, doesn't interrupt editing
+  const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
+  
+  useEffect(() => {
+    // Only update passive validation status, don't set error states
+    if (input.trim() === '') {
+      setValidationStatus('empty');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      try {
+        const { data, error: parseError } = parseJSONSafe(input);
+        setValidationStatus(parseError ? 'invalid' : 'valid');
+      } catch (err) {
+        setValidationStatus('invalid');
+      }
+    }, 500); // Longer debounce for less intrusive validation
+
+    return () => clearTimeout(timer);
+  }, [input]);
+
+  const addToast = useCallback((message: string, type: Toast['type']) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 3000);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Handle shortcuts everywhere, including in Monaco Editor
+      // Only prevent shortcuts when typing in regular text inputs (not Monaco editor)
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        // Don't handle shortcuts in regular text inputs (search field, file input)
+        // But DO allow shortcuts in Monaco editor
+        if (!(event.target as any).__isMonacoEditor) {
+          return;
+        }
+      }
+
+      if (isShortcut(event, KEYBOARD_SHORTCUTS.FORMAT)) {
+        event.preventDefault();
+        handleFormat();
+      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.MINIFY)) {
+        event.preventDefault();
+        handleMinify();
+      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.COPY)) {
+        event.preventDefault();
+        handleCopy();
+      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.CLEAR)) {
+        event.preventDefault();
+        handleClear();
+      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.SEARCH)) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.SAVE)) {
+        event.preventDefault();
+        handleDownload();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [input]);
+
+  // Search functionality
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      const { data } = parseJSONSafe(input);
+      if (data !== null) {
+        const results = searchJSON(data, searchTerm);
+        setSearchResults(results);
+      }
+    } catch (err) {
+      setSearchResults([]);
+    }
+  }, [searchTerm, input]);
+
+  const handleFormat = useCallback(() => {
+    if (!input.trim()) {
+      addToast('No JSON to format', 'error');
+      return;
+    }
+
+    setIsFormatting(true);
+    
+    try {
+      const { data, error: parseError } = parseJSONSafe(input);
+      if (parseError) {
+        // Show error but preserve original content - don't modify editor
+        addToast('Invalid JSON syntax - Please check your syntax and try again', 'error');
+        return;
+      }
+
+      const formatted = formatJSON(data);
+      
+      // Preserve cursor position
+      const editor = editorRef.current;
+      const position = editor ? editor.getPosition() : null;
+      
+      setInput(formatted);
+      
+      // Restore cursor position after formatting
+      setTimeout(() => {
+        if (editor && position) {
+          editor.setPosition(position);
+          editor.focus();
+        }
+      }, 50);
+      
+      addToast('JSON formatted successfully', 'success');
+    } catch (err) {
+      addToast('Failed to format JSON', 'error');
+    } finally {
+      setIsFormatting(false);
+    }
+  }, [input, addToast]);
+
+  const handleMinify = useCallback(() => {
+    if (!input.trim()) {
+      addToast('No JSON to minify', 'error');
+      return;
+    }
+
+    setIsFormatting(true);
+    
+    try {
+      const { data, error: parseError } = parseJSONSafe(input);
+      if (parseError) {
+        // Show error but preserve original content - don't modify editor
+        addToast('Invalid JSON syntax - Please check your syntax and try again', 'error');
+        return;
+      }
+
+      const minified = minifyJSON(data);
+      
+      // Preserve cursor position
+      const editor = editorRef.current;
+      const position = editor ? editor.getPosition() : null;
+      
+      setInput(minified);
+      
+      // Restore cursor position after minifying
+      setTimeout(() => {
+        if (editor && position) {
+          editor.setPosition(position);
+          editor.focus();
+        }
+      }, 50);
+      
+      addToast('JSON minified successfully', 'success');
+    } catch (err) {
+      addToast('Failed to minify JSON', 'error');
+    } finally {
+      setIsFormatting(false);
+    }
+  }, [input, addToast]);
+
+  const handleCopy = useCallback(async () => {
+    if (!input.trim()) {
+      addToast('No JSON to copy', 'error');
+      return;
+    }
+
+    // Validate before copying - only show error if invalid
+    const { data, error: parseError } = parseJSONSafe(input);
+    if (parseError) {
+      addToast('Invalid JSON - Cannot copy invalid syntax', 'error');
+      return;
+    }
+
+    const success = await copyToClipboard(input);
+    if (success) {
+      addToast('JSON copied to clipboard', 'success');
+    } else {
+      addToast('Failed to copy JSON', 'error');
+    }
+  }, [input, addToast]);
+
+  const handleClear = useCallback(() => {
+    setInput('');
+    setSearchTerm('');
+    setSearchResults([]);
+    addToast('JSON cleared', 'info');
+  }, [addToast]);
+
+  const handleDownload = useCallback(() => {
+    if (!input.trim()) {
+      addToast('No JSON to download', 'error');
+      return;
+    }
+
+    // Validate before downloading - only show error if invalid
+    const { data, error: parseError } = parseJSONSafe(input);
+    if (parseError) {
+      addToast('Invalid JSON - Cannot download invalid syntax', 'error');
+      return;
+    }
+
+    const filename = data && typeof data === 'object' && Object.keys(data).length > 0 
+      ? `formatted_${Date.now()}.json` 
+      : 'formatted.json';
+    
+    downloadJSON(input, filename);
+    addToast('JSON downloaded', 'success');
+  }, [input, addToast]);
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      addToast('Please select a JSON file', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error: parseError } = await parseJSONFile(file);
+      
+      if (parseError) {
+        addToast('Invalid JSON file: ' + parseError.message, 'error');
+        return;
+      }
+
+      setInput(JSON.stringify(data, null, 2));
+      addToast(`Loaded ${file.name}`, 'success');
+    } catch (err) {
+      addToast('Failed to load file', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [addToast]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }, [handleFileUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  // Get current data for tree view
+  const { data: parsedData } = parseJSONSafe(input);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-center">
+            <div className="flex items-center space-x-3">
+              <FileText className="h-8 w-8 text-primary" />
+              <div className="text-center">
+                <h1 className="text-2xl font-bold">JsonBro</h1>
+                <p className="text-sm text-muted-foreground">Prettify JSON like a pro, bro</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+
+        {/* Main Editor Area - Improved Layout */}
+        <div>
+          <div className="w-full max-w-[85%] mx-auto">
+            {/* Action Buttons - Aligned with Editor */}
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="h-9"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+              
+              <Button
+                variant={viewMode === 'formatted' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('formatted')}
+              >
+                Editor
+              </Button>
+              
+              <Button
+                variant={viewMode === 'tree' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('tree')}
+              >
+                Tree View
+              </Button>
+            </div>
+
+            {/* Main Action Buttons - Aligned with Editor */}
+            <div className="flex items-center justify-center flex-wrap gap-3 mb-4">
+              <Button 
+                onClick={handleFormat} 
+                variant="outline" 
+                disabled={isFormatting || !input.trim()}
+                className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
+              >
+                {isFormatting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Format</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">(Ctrl+F)</span>
+              </Button>
+              
+              <Button 
+                onClick={handleMinify} 
+                variant="outline" 
+                disabled={isFormatting || !input.trim()}
+                className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
+              >
+                {isFormatting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Minify</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">(Ctrl+M)</span>
+              </Button>
+              
+              <Button 
+                onClick={handleCopy} 
+                variant="outline" 
+                disabled={!input.trim()} 
+                className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
+              >
+                <Copy className="h-4 w-4" />
+                <span className="hidden sm:inline">Copy</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">(Ctrl+C)</span>
+              </Button>
+              
+              <Button 
+                onClick={handleDownload} 
+                variant="outline" 
+                disabled={!input.trim()} 
+                className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Save</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">(Ctrl+S)</span>
+              </Button>
+              
+              <Button onClick={handleClear} variant="outline" className="flex items-center gap-2 hover:bg-destructive/10 hover:border-destructive/20 transition-colors">
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Clear</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">(Ctrl+K)</span>
+              </Button>
+            </div>
+
+            {/* Search and File Upload - Aligned with Editor */}
+            <div className="flex gap-4 items-center justify-center mb-4">
+              <div className="relative flex-1 max-w-lg">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  placeholder="Search JSON... (Ctrl+H)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 transition-all focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                className="hidden"
+              />
+              
+              <Button 
+                onClick={() => fileInputRef.current?.click()} 
+                variant="outline" 
+                className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Upload File</span>
+              </Button>
+            </div>
+
+            {/* Search Results - Aligned with Editor */}
+            {searchTerm && searchResults.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-3 max-w-[600px] mx-auto">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Found {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {searchResults.slice(0, 5).map((result, index) => (
+                    <div key={index} className="text-sm font-mono p-2 bg-background rounded border">
+                      <span className="text-muted-foreground">{result.path}:</span>
+                      <span className="ml-2">{typeof result.value === 'string' ? `"${result.value}"` : String(result.value)}</span>
+                    </div>
+                  ))}
+                  {searchResults.length > 5 && (
+                    <p className="text-xs text-muted-foreground px-2">
+                      ... and {searchResults.length - 5} more
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Status Bar */}
+            <div className="flex items-center justify-between mb-6 p-4 bg-muted/30 rounded-lg border">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  JSON Editor
+                </h3>
+                <div className="flex items-center space-x-3 text-sm">
+                  <span className="text-muted-foreground">{input.length} characters</span>
+                  <div className="w-px h-4 bg-border"></div>
+                  {validationStatus === 'invalid' && (
+                    <span className="flex items-center gap-1.5 text-destructive bg-destructive/10 px-2 py-1 rounded-full text-xs">
+                      <AlertCircle className="h-3 w-3" />
+                      <span className="hidden sm:inline">Invalid JSON</span>
+                    </span>
+                  )}
+                  {validationStatus === 'valid' && (
+                    <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="hidden sm:inline">Valid JSON</span>
+                    </span>
+                  )}
+                  {validationStatus === 'empty' && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 px-2 py-1 rounded-full text-xs">
+                      <FileText className="h-3 w-3" />
+                      <span className="hidden sm:inline">Ready to edit</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {viewMode === 'tree' && parsedData && validationStatus === 'valid' && (
+                <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+                  {Array.isArray(parsedData) ? `${parsedData.length} items` : `${Object.keys(parsedData || {}).length} properties`}
+                </div>
+              )}
+            </div>
+            
+            <div
+              className={`relative border border-border rounded-xl transition-all duration-200 shadow-sm ${
+                isDragOver 
+                  ? 'border-primary bg-primary/10 shadow-md ring-2 ring-primary/20' 
+                  : 'hover:border-primary/50 hover:shadow-md'
+              }`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+            >
+              {isLoading && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              )}
+              
+              {viewMode === 'tree' && parsedData && validationStatus === 'valid' ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="max-h-[600px] overflow-auto p-4">
+                    <ReactJson 
+                      src={parsedData}
+                      theme={theme === 'dark' ? 'monokai' : 'rjv-default'}
+                      name={null}
+                      displayObjectSize={true}
+                      displayDataTypes={false}
+                      enableClipboard={true}
+                      style={{
+                        backgroundColor: 'transparent',
+                        fontSize: '14px',
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                      iconStyle="circle"
+                      indentWidth={2}
+                      collapseStringsAfterLength={80}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <MonacoJSONEditor
+                  ref={editorRef}
+                  value={input}
+                  onChange={(value) => setInput(value || '')}
+                  theme={theme}
+                  height="600px"
+                  options={{
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    minimap: { enabled: true },
+                    showFoldingControls: 'always',
+                    bracketPairColorization: { enabled: true },
+                    guides: {
+                      bracketPairs: true,
+                      indentation: true
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`p-3 rounded-lg border shadow-lg min-w-[300px] animate-in slide-in-from-bottom-2 ${
+              toast.type === 'success' 
+                ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200'
+                : toast.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200'
+                : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-200'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {toast.type === 'success' && <CheckCircle className="h-4 w-4" />}
+              {toast.type === 'error' && <AlertCircle className="h-4 w-4" />}
+              {toast.type === 'info' && <FileText className="h-4 w-4" />}
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
