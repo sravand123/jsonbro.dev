@@ -1,0 +1,60 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main            # or your default branch
+  workflow_dispatch:   # manual trigger in Actions UI
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.upload.outputs.artifact_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'        # pick an LTS you use
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9   # adjust to the pnpm major you want, or remove to use latest
+
+      - name: Verify pnpm
+        run: pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Upload Pages artifact
+        id: upload
+        # packages the `dist` folder for GitHub Pages deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
