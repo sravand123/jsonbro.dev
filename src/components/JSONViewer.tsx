@@ -318,6 +318,46 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   // Get current data for tree view
   const { data: parsedData } = parseJSONSafe(input);
 
+  // Handlers for ReactJson onAdd/onEdit/onDelete to sync changes back to the editor
+  const handleReactJsonAdd = (edit: any) => {
+    try {
+      if (edit && edit.updated_src) {
+        const newValue = JSON.stringify(edit.updated_src, null, 2);
+        setInput(newValue);
+        setValidationStatus('valid');
+        addToast('Property added', 'success');
+      }
+    } catch (err) {
+      addToast('Failed to apply addition', 'error');
+    }
+  };
+
+  const handleReactJsonEdit = (edit: any) => {
+    try {
+      if (edit && edit.updated_src) {
+        const newValue = JSON.stringify(edit.updated_src, null, 2);
+        setInput(newValue);
+        setValidationStatus('valid');
+        addToast('Property updated', 'success');
+      }
+    } catch (err) {
+      addToast('Failed to apply edit', 'error');
+    }
+  };
+
+  const handleReactJsonDelete = (edit: any) => {
+    try {
+      if (edit && edit.updated_src) {
+        const newValue = JSON.stringify(edit.updated_src, null, 2);
+        setInput(newValue);
+        setValidationStatus('valid');
+        addToast('Property deleted', 'success');
+      }
+    } catch (err) {
+      addToast('Failed to apply delete', 'error');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
@@ -544,6 +584,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                       iconStyle="circle"
                       indentWidth={2}
                       collapseStringsAfterLength={80}
+                      // Sync edits made in the tree view back to the editor
+                      onAdd={handleReactJsonAdd}
+                      onEdit={handleReactJsonEdit}
+                      onDelete={handleReactJsonDelete}
                     />
                   </div>
                 </div>
