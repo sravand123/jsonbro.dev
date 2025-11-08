@@ -501,20 +501,25 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
             endColumn: position.column
           };
           
-          // Filter out any suggestions containing $schema
-          const filteredSuggestions = relevantSuggestions
-            .filter(suggestion => {
-              const text = (suggestion.label || suggestion.insertText || '').toString().toLowerCase();
-              return !text.includes('$schema');
-            })
-            .map(suggestion => ({
-              ...suggestion,
-              range: wordRange
-            }));
+          // Filter out any suggestions containing $schema and deduplicate by insertText/label
+          const seen = new Set<string>();
+          const uniqueSuggestions: any[] = [];
 
-          return {
-            suggestions: filteredSuggestions
-          };
+          for (const suggestion of relevantSuggestions) {
+            const textRaw = (suggestion.insertText || suggestion.label || '').toString();
+            const text = textRaw.toLowerCase();
+
+            if (!text || text.includes('$schema')) continue;
+
+            // Use the raw text as the uniqueness key (preserves quotes if present)
+            const key = textRaw;
+            if (seen.has(key)) continue;
+
+            seen.add(key);
+            uniqueSuggestions.push({ ...suggestion, range: wordRange });
+          }
+
+          return { suggestions: uniqueSuggestions };
         } catch (error) {
           console.error('Completion provider error:', error);
           return { suggestions: [] };
