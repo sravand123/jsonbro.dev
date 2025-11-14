@@ -61,19 +61,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
           const stringContent = match.slice(1, -1);
           if (stringContent.length > 0) {
             const words = stringContent.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
-            
-            // Add single words
             words.forEach(word => chunks.add(word));
-            
-            // Generate 2-word chunks
-            for (let i = 0; i < words.length - 1; i++) {
-              chunks.add(`${words[i]} ${words[i + 1]}`);
-            }
-            
-            // Generate 3-word chunks
-            for (let i = 0; i < words.length - 2; i++) {
-              chunks.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
-            }
           }
         });
       }
@@ -112,31 +100,13 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     
     if (typeof obj === 'string') {
       const words = obj.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
-      
-      // Single words
-      words.forEach(word => chunks.add(word));
-      
-      // 2-word chunks
-      for (let i = 0; i < words.length - 1; i++) {
-        chunks.add(`${words[i]} ${words[i + 1]}`);
-      }
-      
-      // 3-word chunks
-      for (let i = 0; i < words.length - 2; i++) {
-        chunks.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
-      }
+      words.forEach(word => chunks.add(word));  
     } else if (Array.isArray(obj)) {
       obj.forEach(item => extractChunksFromObject(item, chunks));
     } else if (typeof obj === 'object') {
       Object.keys(obj).forEach(key => {
         const keyWords = key.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
-        
-        // Add key words and chunks
         keyWords.forEach(word => chunks.add(word));
-        for (let i = 0; i < keyWords.length - 1; i++) {
-          chunks.add(`${keyWords[i]} ${keyWords[i + 1]}`);
-        }
-        
         extractChunksFromObject(obj[key], chunks);
       });
     }
