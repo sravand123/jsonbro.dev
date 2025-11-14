@@ -17,6 +17,7 @@ import {
   FileCode,
   FileCheck,
 } from 'lucide-react';
+import { GitHubStars } from './GitHubStars';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -402,12 +403,15 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-center">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold">🧩JsonBro.Dev</h1>
-                <p className="text-sm text-muted-foreground">Handle JSON like a pro, bro!!</p>
-              </div>
+        <div className="container mx-auto px-4 py-4 relative">
+          <div className="flex justify-center">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold">🧩JsonBro.Dev</h1>
+              <p className="text-sm text-muted-foreground">Handle JSON like a pro, bro!!</p>
+            </div>
+          </div>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+            <GitHubStars />
           </div>
         </div>
       </header>
