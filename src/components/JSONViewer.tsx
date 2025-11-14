@@ -11,7 +11,11 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
-
+  GitCompare,
+  Pencil,
+  ArrowLeft,
+  FileCode,
+  FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +33,7 @@ import {
   type JSONNode 
 } from '../utils/jsonUtils';
 import { MonacoJSONEditor } from './MonacoJSONEditor';
+import Editor, { DiffEditor } from '@monaco-editor/react';
 import ReactJson from 'react-json-view';
 
 interface JSONViewerProps {
@@ -43,6 +48,12 @@ interface Toast {
 }
 
 export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) {
+  // For diff mode
+  const [leftInput, setLeftInput] = useState('');
+  const [rightInput, setRightInput] = useState('');
+  const [showDiff, setShowDiff] = useState(false);
+  const leftEditorRef = useRef<any>(null);
+  const rightEditorRef = useRef<any>(null);
   const [input, setInput] = useState('');
   const [error, setError] = useState<{ message: string; line?: number; column?: number; position?: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -50,7 +61,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [searchResults, setSearchResults] = useState<JSONNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [viewMode, setViewMode] = useState<'formatted' | 'tree'>('formatted');
+  const [viewMode, setViewMode] = useState<'formatted' | 'diff'>('formatted');
   const [isFormatting, setIsFormatting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -482,7 +493,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                       <span className="text-muted-foreground">{result.path}:</span>
                       <span className="ml-2">{typeof result.value === 'string' ? `"${result.value}"` : String(result.value)}</span>
                     </div>
-                  ))}
+                  ))}xd
                   {searchResults.length > 5 && (
                     <p className="text-xs text-muted-foreground px-2">
                       ... and {searchResults.length - 5} more
@@ -494,60 +505,155 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
             {/* Status Bar */}
             <div className="flex items-center justify-between mb-6 p-4 bg-muted/30 rounded-lg border">
               <div className="flex items-center space-x-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  JSON Editor
-                </h3>
-                <div className="flex items-center space-x-3 text-sm">
-                  <span className="text-muted-foreground">{input.length} characters</span>
-                  <div className="w-px h-4 bg-border"></div>
-                  {validationStatus === 'invalid' && (
-                    <span className="flex items-center gap-1.5 text-destructive bg-destructive/10 px-2 py-1 rounded-full text-xs">
-                      <AlertCircle className="h-3 w-3" />
-                      <span className="hidden sm:inline">Invalid JSON</span>
-                    </span>
-                  )}
-                  {validationStatus === 'valid' && (
-                    <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
-                      <CheckCircle className="h-3 w-3" />
-                      <span className="hidden sm:inline">Valid JSON</span>
-                    </span>
-                  )}
-                  {validationStatus === 'empty' && (
-                    <span className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 px-2 py-1 rounded-full text-xs">
-                      <FileText className="h-3 w-3" />
-                      <span className="hidden sm:inline">Ready to edit</span>
-                    </span>
-                  )}
-                </div>
-                 {/* Action Buttons - Aligned with Editor */}
+                {viewMode === 'diff' && showDiff ? (
+                  <>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <GitCompare className="h-5 w-5 text-primary" />
+                      JSON Diff
+                    </h3>
+                    <div className="flex items-center space-x-3 text-sm">
+                      <span className="text-muted-foreground">
+                        {leftInput.length + rightInput.length} total characters
+                      </span>
+                      <div className="w-px h-4 bg-border"></div>
+                      {leftInput.trim() && (() => {
+                        const { error: leftError } = parseJSONSafe(leftInput);
+                        const { error: rightError } = parseJSONSafe(rightInput);
+                        if (leftError || rightError) {
+                          return (
+                            <span className="flex items-center gap-1.5 text-destructive bg-destructive/10 px-2 py-1 rounded-full text-xs">
+                              <AlertCircle className="h-3 w-3" />
+                              <span className="hidden sm:inline">Invalid JSON</span>
+                            </span>
+                          );
+                        }
+                        if (leftInput.trim() && rightInput.trim()) {
+                          return (
+                            <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
+                              <CheckCircle className="h-3 w-3" />
+                              <span className="hidden sm:inline">Both Valid</span>
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </>
+                ) : viewMode === 'diff' ? (
+                  <>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <FileCode className="h-5 w-5 text-primary" />
+                      JSON Diff
+                    </h3>
+                    <div className="flex items-center space-x-3 text-sm">
+                      <span className="text-muted-foreground">
+                        {leftInput.length + rightInput.length} total characters
+                      </span>
+                      <div className="w-px h-4 bg-border"></div>
+                      {leftInput.trim() && (() => {
+                        const { error: leftError } = parseJSONSafe(leftInput);
+                        const { error: rightError } = parseJSONSafe(rightInput);
+                        if (leftError || rightError) {
+                          return (
+                            <span className="flex items-center gap-1.5 text-destructive bg-destructive/10 px-2 py-1 rounded-full text-xs">
+                              <AlertCircle className="h-3 w-3" />
+                              <span className="hidden sm:inline">Invalid JSON</span>
+                            </span>
+                          );
+                        }
+                        if (leftInput.trim() && rightInput.trim()) {
+                          return (
+                            <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
+                              <CheckCircle className="h-3 w-3" />
+                              <span className="hidden sm:inline">Both Valid</span>
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      JSON Editor
+                    </h3>
+                    <div className="flex items-center space-x-3 text-sm">
+                      <span className="text-muted-foreground">{input.length} characters</span>
+                      <div className="w-px h-4 bg-border"></div>
+                      {validationStatus === 'invalid' && (
+                        <span className="flex items-center gap-1.5 text-destructive bg-destructive/10 px-2 py-1 rounded-full text-xs">
+                          <AlertCircle className="h-3 w-3" />
+                          <span className="hidden sm:inline">Invalid JSON</span>
+                        </span>
+                      )}
+                      {validationStatus === 'valid' && (
+                        <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
+                          <CheckCircle className="h-3 w-3" />
+                          <span className="hidden sm:inline">Valid JSON</span>
+                        </span>
+                      )}
+                      {validationStatus === 'empty' && (
+                        <span className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 px-2 py-1 rounded-full text-xs">
+                          <FileText className="h-3 w-3" />
+                          <span className="hidden sm:inline">Ready to edit</span>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
-            <div className="flex items-center justify-end space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="h-9"
-              >
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-              
-              <Button
-                variant={viewMode === 'formatted' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('formatted')}
-              >
-                Editor
-              </Button>
-              
-              <Button
-                variant={viewMode === 'tree' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('tree')}
-              >
-                Tree View
-              </Button>
-            </div>
+              <div className="flex items-center justify-end space-x-2">
+                {viewMode === 'diff' && !showDiff && (
+                  <Button
+                    onClick={() => setShowDiff(true)}
+                    variant="default"
+                    size="sm"
+                    className="flex items-center gap-2"
+                    disabled={!leftInput.trim() || !rightInput.trim()}
+                    aria-label="Show diff"
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    <span>Show Diff</span>
+                  </Button>
+                )}
+                {viewMode === 'diff' && showDiff && (
+                  <Button
+                    onClick={() => setShowDiff(false)}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                    aria-label="Back to editing"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    <span>Back to Edit</span>
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="h-9"
+                >
+                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+                
+                <Button
+                  variant={viewMode === 'formatted' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('formatted')}
+                >
+                  Editor
+                </Button>
+                <Button
+                  variant={viewMode === 'diff' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('diff')}
+                >
+                  Diff
+                </Button>
+              </div>
             </div>
             
             <div
@@ -566,31 +672,135 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </div>
               )}
               
-              {viewMode === 'tree' && parsedData && validationStatus === 'valid' ? (
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="max-h-[600px] overflow-auto p-4">
-                    <ReactJson 
-                      src={parsedData}
-                      theme={theme === 'dark' ? 'monokai' : 'rjv-default'}
-                      name={null}
-                      displayObjectSize={true}
-                      displayDataTypes={false}
-                      enableClipboard={true}
-                      style={{
-                        backgroundColor: 'transparent',
-                        fontSize: '14px',
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
-                      iconStyle="circle"
-                      indentWidth={2}
-                      collapseStringsAfterLength={80}
-                      // Sync edits made in the tree view back to the editor
-                      onAdd={handleReactJsonAdd}
-                      onEdit={handleReactJsonEdit}
-                      onDelete={handleReactJsonDelete}
-                    />
+              {viewMode === 'diff' ? (
+                showDiff ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Diff Editor */}
+                    <div className="relative border rounded-lg overflow-hidden shadow-sm bg-card" style={{ height: 600 }}>
+                      <DiffEditor
+                        height="600px"
+                        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+                        original={leftInput}
+                        modified={rightInput}
+                        language="json"
+                        options={{
+                          readOnly: true,
+                          fontSize: 14,
+                          lineHeight: 1.6,
+                          minimap: { enabled: true },
+                          renderSideBySide: true,
+                          scrollBeyondLastLine: false,
+                          wordWrap: 'on',
+                        }}
+                        loading={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {/* Dual Editor Layout */}
+                    <div className="flex flex-row gap-3">
+                      {/* Left Editor */}
+                      <div className="flex-1 flex flex-col">
+                        <div className="flex items-center justify-between mb-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">Original</span>
+                          </div>
+                          {leftInput.trim() && (() => {
+                            const { error } = parseJSONSafe(leftInput);
+                            return error ? (
+                              <span className="flex items-center gap-1 text-xs text-destructive">
+                                <AlertCircle className="h-3 w-3" />
+                                Invalid
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                <CheckCircle className="h-3 w-3" />
+                                Valid
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div className="border rounded-lg overflow-hidden shadow-sm">
+                          <MonacoJSONEditor
+                            ref={leftEditorRef}
+                            value={leftInput}
+                            onChange={(value) => setLeftInput(value || '')}
+                            theme={theme}
+                            height="650px"
+                            options={{
+                              fontSize: 15,
+                              lineHeight: 1.7,
+                              minimap: { enabled: true },
+                              showFoldingControls: 'always',
+                              bracketPairColorization: { enabled: true },
+                              scrollBeyondLastLine: false,
+                              wordWrap: 'on',
+                              padding: { top: 16, bottom: 16 },
+                              guides: {
+                                bracketPairs: true,
+                                indentation: true
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Center Divider */}
+                      <div className="flex flex-col justify-center items-center px-1">
+                        <div className="w-px h-full bg-border"></div>
+                      </div>
+
+                      {/* Right Editor */}
+                      <div className="flex-1 flex flex-col">
+                        <div className="flex items-center justify-between mb-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <FileCheck className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">Modified</span>
+                          </div>
+                          {rightInput.trim() && (() => {
+                            const { error } = parseJSONSafe(rightInput);
+                            return error ? (
+                              <span className="flex items-center gap-1 text-xs text-destructive">
+                                <AlertCircle className="h-3 w-3" />
+                                Invalid
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                <CheckCircle className="h-3 w-3" />
+                                Valid
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div className="border rounded-lg overflow-hidden shadow-sm">
+                          <MonacoJSONEditor
+                            ref={rightEditorRef}
+                            value={rightInput}
+                            onChange={(value) => setRightInput(value || '')}
+                            theme={theme}
+                            height="650px"
+                            options={{
+                              fontSize: 15,
+                              lineHeight: 1.7,
+                              minimap: { enabled: true },
+                              showFoldingControls: 'always',
+                              bracketPairColorization: { enabled: true },
+                              scrollBeyondLastLine: false,
+                              wordWrap: 'on',
+                              padding: { top: 16, bottom: 16 },
+                              guides: {
+                                bracketPairs: true,
+                                indentation: true
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
               ) : (
                 <MonacoJSONEditor
                   ref={editorRef}
