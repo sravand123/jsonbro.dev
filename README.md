@@ -1,50 +1,77 @@
-# React + TypeScript + Vite
+# JsonBro.Dev
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![GitHub stars](https://img.shields.io/github/stars/sravand123/jsonbro.dev?style=social)](https://github.com/sravand123/jsonbro.dev/stargazers)
 
-Currently, two official plugins are available:
+A powerful, feature-rich JSON viewer, formatter, and validator built with React, TypeScript, and Monaco Editor. This tool helps developers work with JSON data more efficiently with a clean, intuitive interface.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+[![Try It Online](https://img.shields.io/badge/Try_It_Online-jsonbro.dev-4CAF50?style=for-the-badge&logo=json&logoColor=white)](https://jsonbro.dev)
 
-## Expanding the ESLint configuration
+## ✨ Features
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+- 🔍 **JSON Validation** - Real-time validation with detailed error messages
+- 🎨 **Syntax Highlighting** - Beautifully formatted JSON with syntax highlighting
+- 🔄 **Format & Minify** - Easily format or minify your JSON
+- 🔎 **Search** - Powerful search functionality to find content within large JSON files
+- 🌓 **Dark/Light Theme** - Choose your preferred color scheme
+- 📋 **Copy to Clipboard** - One-click copy of formatted JSON
+- 📥 **File Upload** - Drag & drop or click to upload JSON files
+- 🔄 **Diff Viewer** - Compare two JSON files side by side
+- ⌨️ **Keyboard Shortcuts** - Work faster with handy keyboard shortcuts
+- 📱 **Responsive Design** - Works on desktop and mobile devices
 
-- Configure the top-level `parserOptions` property like this:
+## 🚀 Getting Started
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+### Prerequisites
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+- Node.js (v14 or later)
+- pnpm
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+### Installation
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/sravand123/jsonbro.dev.git
+   cd jsonbro.dev
+   ```
+
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+
+3. Start the development server:
+   ```bash
+   pnpm run dev
+   ```
+
+4. Open [http://localhost:5173](http://localhost:5173) to view it in your browser.
+
+## 🛠️ Usage
+
+1. **Input JSON**: Paste your JSON directly into the editor or upload a file
+2. **Format**: Click the "Format" button to format your JSON with proper indentation
+3. **Minify**: Click "Minify" to remove all unnecessary whitespace
+4. **Search**: Use the search bar to find specific content within your JSON
+5. **Copy**: Click the copy button to copy the formatted JSON to your clipboard
+6. **Download**: Save your JSON to a file with the download button
+7. **Toggle Theme**: Switch between light and dark mode using the theme toggle
+
+### Styling
+
+This project uses Tailwind CSS for styling. You can customize the theme in `tailwind.config.js`.
+
+
+## 📚 Dependencies
+
+- [React](https://reactjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/)
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/)
+- [Lucide Icons](https://lucide.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+
+## 📬 Contact
+
+Sravan Kumar  sravandasari111@gmail.com
