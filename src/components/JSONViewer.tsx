@@ -711,8 +711,8 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                     <p className="text-sm text-muted-foreground mb-2">
                       Found {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
                     </p>
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {searchResults.slice(0, 5).map((result, index) => (
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {searchResults.map((result, index) => (
                         <div 
                           key={index} 
                           className={`text-sm font-mono p-2 rounded border cursor-pointer transition-colors ${
@@ -723,14 +723,11 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                           onClick={() => handleSearchResultClick(result, index)}
                         >
                           <span className="text-muted-foreground">{result.path}:</span>
-                          <span className="ml-2">{typeof result.value === 'string' ? `"${result.value}"` : String(result.value)}</span>
+                          <span className="ml-2">
+                            {typeof result.value === 'string' ? `"${result.value}"` : String(result.value === null ? 'null' : result.value)}
+                          </span>
                         </div>
                       ))}
-                      {searchResults.length > 5 && (
-                        <p className="text-xs text-muted-foreground px-2">
-                          ... and {searchResults.length - 5} more
-                        </p>
-                      )}
                     </div>
                   </div>
                 )}
