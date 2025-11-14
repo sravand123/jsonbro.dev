@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
 import Editor, { OnMount, OnChange } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 
+// Track if we've already registered the completion provider
+let isCompletionProviderRegistered = false;
+
 interface MonacoJSONEditorProps {
   value: string;
   onChange: OnChange;
@@ -117,9 +120,10 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
   const getWordBasedSuggestions = (context: { text: string; path: string[]; isValue: boolean; insideQuotes: boolean }, existingWords: string[], existingChunks: string[]) => {
     const inputText = context.text;
     const suggestions: any[] = [];
-    const processedSuggestions = new Set<string>(); // Track to avoid duplicates
+    const processedSuggestions = new Set<string>(); // Track to avoid duplicates by insert text
     const allWords = new Set<string>(); // Track all words for better deduplication
     const lowercaseToOriginal = new Map<string, string>(); // Map lowercase to original case
+    const existingSuggestions = new Set<string>(); // Track existing suggestions by label
     
     // Use the insideQuotes flag from context
     const shouldAddQuotes = !context.insideQuotes;
@@ -176,11 +180,15 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
                 };
 
             const suggestionKey = suggestion.insertText.toLowerCase();
-            if (!processedSuggestions.has(suggestionKey)) {
-              suggestions.push(suggestion);
-              processedSuggestions.add(suggestionKey);
-              allWords.add(lowerWord);
-            }
+          const suggestionLabel = suggestion.label.toLowerCase();
+          
+          // Check if we've already added this exact suggestion or a very similar one
+          if (!processedSuggestions.has(suggestionKey) && !existingSuggestions.has(suggestionLabel)) {
+            suggestions.push(suggestion);
+            processedSuggestions.add(suggestionKey);
+            existingSuggestions.add(suggestionLabel);
+            allWords.add(lowerWord);
+          }
           }
         }
       }
@@ -220,9 +228,13 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
                 };
 
             const suggestionKey = suggestion.insertText.toLowerCase();
-            if (!processedSuggestions.has(suggestionKey)) {
+            const suggestionLabel = suggestion.label.toLowerCase();
+            
+            // Check if we've already added this exact suggestion or a very similar one
+            if (!processedSuggestions.has(suggestionKey) && !existingSuggestions.has(suggestionLabel)) {
               suggestions.push(suggestion);
               processedSuggestions.add(suggestionKey);
+              existingSuggestions.add(suggestionLabel);
             }
           }
         }
@@ -533,8 +545,12 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       diagnostics: false // Disable diagnostics which can trigger schema suggestions
     });
 
-    // Register enhanced completion provider with nested JSON awareness
-    monaco.languages.registerCompletionItemProvider('json', {
+    // Only register the completion provider once
+    if (!isCompletionProviderRegistered) {
+      isCompletionProviderRegistered = true;
+      
+      // Register enhanced completion provider with nested JSON awareness
+      monaco.languages.registerCompletionItemProvider('json', {
       provideCompletionItems: (model, position) => {
         try {
           const fullContent = model.getValue();
@@ -642,8 +658,9 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
         // Underscore
         '_'
-      ]
-    });
+        ]
+      });
+    }
 
     // Configure JSON language features - Disable schema suggestions
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
