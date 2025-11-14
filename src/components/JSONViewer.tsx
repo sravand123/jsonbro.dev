@@ -156,6 +156,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Disable all shortcuts in diff mode
+      if (viewMode === 'diff') {
+        return;
+      }
       // Get the active element
       const activeElement = document.activeElement;
       if (!activeElement) return;
@@ -216,7 +220,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [input]);
+  }, [input, viewMode]);
 
   // Handle editor mount
   const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
@@ -607,7 +611,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               <Button 
                 onClick={handleFormat} 
                 variant="outline" 
-                disabled={isFormatting || !input.trim()}
+                disabled={viewMode === 'diff' || isFormatting || !input.trim()}
                 className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
               >
                 {isFormatting ? (
@@ -622,7 +626,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               <Button 
                 onClick={handleMinify} 
                 variant="outline" 
-                disabled={isFormatting || !input.trim()}
+                disabled={viewMode === 'diff' || isFormatting || !input.trim()}
                 className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
               >
                 {isFormatting ? (
@@ -637,7 +641,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               <Button 
                 onClick={handleCopy} 
                 variant="outline" 
-                disabled={!input.trim()} 
+                disabled={viewMode === 'diff' || !input.trim()} 
                 className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
               >
                 <Copy className="h-4 w-4" />
@@ -648,7 +652,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               <Button 
                 onClick={handleDownload} 
                 variant="outline" 
-                disabled={!input.trim()} 
+                disabled={viewMode === 'diff' || !input.trim()}
                 className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
               >
                 <Download className="h-4 w-4" />
@@ -656,7 +660,12 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.SAVE.key)})</span>
               </Button>
               
-              <Button onClick={handleClear} variant="outline" className="flex items-center gap-2 hover:bg-destructive/10 hover:border-destructive/20 transition-colors">
+              <Button 
+                onClick={handleClear} 
+                variant="outline" 
+                disabled={viewMode === 'diff'}
+                className="flex items-center gap-2 hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Clear</span>
                 <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.CLEAR.key)})</span>
