@@ -145,21 +145,44 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
   const searchLower = searchTerm.toLowerCase();
 
   function searchRecursive(obj: any, path: string) {
-    if (obj === null) return;
+    // Handle null values - make them searchable
+    if (obj === null) {
+      if (searchLower.includes('null')) {
+        results.push({
+          value: null,
+          type: 'null',
+          path
+        });
+      }
+      return;
+    }
     
-    if (typeof obj === 'string' && obj.toLowerCase().includes(searchLower)) {
-      results.push({
-        value: obj,
-        type: 'string',
-        path
-      });
-    } else if (typeof obj === 'number' && obj.toString().includes(searchTerm)) {
-      results.push({
-        value: obj,
-        type: 'number',
-        path
-      });
-    } else if (typeof obj === 'boolean') {
+    // Handle string values
+    if (typeof obj === 'string') {
+      if (obj.toLowerCase().includes(searchLower)) {
+        results.push({
+          value: obj,
+          type: 'string',
+          path
+        });
+      }
+      return;
+    }
+    
+    // Handle number values
+    if (typeof obj === 'number') {
+      if (obj.toString().includes(searchTerm)) {
+        results.push({
+          value: obj,
+          type: 'number',
+          path
+        });
+      }
+      return;
+    }
+    
+    // Handle boolean values
+    if (typeof obj === 'boolean') {
       const boolStr = obj.toString();
       if (boolStr.toLowerCase().includes(searchLower)) {
         results.push({
@@ -168,21 +191,39 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
           path
         });
       }
-    } else if (Array.isArray(obj)) {
+      return;
+    }
+    
+    // Handle arrays
+    if (Array.isArray(obj)) {
       obj.forEach((item, index) => {
-        searchRecursive(item, `${path}[${index}]`);
+        const itemPath = path === 'root' ? `root[${index}]` : `${path}[${index}]`;
+        searchRecursive(item, itemPath);
       });
-    } else if (typeof obj === 'object') {
+      return;
+    }
+    
+    // Handle objects
+    if (typeof obj === 'object') {
       Object.keys(obj).forEach(key => {
+        const keyPath = path === 'root' ? `root.${key}` : `${path}.${key}`;
+        
+        // Check if key matches search term
         if (key.toLowerCase().includes(searchLower)) {
           results.push({
             key,
             value: obj[key],
-            type: 'object',
-            path: `${path}.${key}`
+            type: typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key]) 
+              ? 'object' 
+              : Array.isArray(obj[key]) 
+              ? 'array' 
+              : typeof obj[key] as 'string' | 'number' | 'boolean' | 'null',
+            path: keyPath
           });
         }
-        searchRecursive(obj[key], `${path}.${key}`);
+        
+        // Recursively search the value
+        searchRecursive(obj[key], keyPath);
       });
     }
   }

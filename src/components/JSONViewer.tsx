@@ -54,7 +54,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [showDiff, setShowDiff] = useState(false);
   const leftEditorRef = useRef<any>(null);
   const rightEditorRef = useRef<any>(null);
-  const [input, setInput] = useState('');
+  // Load saved input from localStorage on mount
+  const [input, setInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('json-viewer-input');
+      return saved || '';
+    }
+    return '';
+  });
   const [error, setError] = useState<{ message: string; line?: number; column?: number; position?: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,6 +77,13 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   // Passive validation - only for status indicators, doesn't interrupt editing
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
   
+  // Save input to localStorage when it changes (only in normal mode)
+  useEffect(() => {
+    if (viewMode === 'formatted' && typeof window !== 'undefined') {
+      localStorage.setItem('json-viewer-input', input);
+    }
+  }, [input, viewMode]);
+
   useEffect(() => {
     // Only update passive validation status, don't set error states
     if (input.trim() === '') {
@@ -143,11 +157,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     }
 
     try {
-      const { data } = parseJSONSafe(input);
-      if (data !== null) {
-        const results = searchJSON(data, searchTerm);
-        setSearchResults(results);
+      const { data, error } = parseJSONSafe(input);
+      if (error) {
+        setSearchResults([]);
+        return;
       }
+      // Allow searching even if data is null (for root-level null values)
+      const results = searchJSON(data, searchTerm);
+      setSearchResults(results);
     } catch (err) {
       setSearchResults([]);
     }
@@ -255,11 +272,23 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   }, [input, addToast]);
 
   const handleClear = useCallback(() => {
-    setInput('');
-    setSearchTerm('');
-    setSearchResults([]);
-    addToast('JSON cleared', 'info');
-  }, [addToast]);
+    if (viewMode === 'diff') {
+      setLeftInput('');
+      setRightInput('');
+      if (showDiff) {
+        setShowDiff(false);
+      }
+      addToast('Both editors cleared', 'info');
+    } else {
+      setInput('');
+      setSearchTerm('');
+      setSearchResults([]);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('json-viewer-input');
+      }
+      addToast('JSON cleared', 'info');
+    }
+  }, [viewMode, showDiff, addToast]);
 
   const handleDownload = useCallback(() => {
     if (!input.trim()) {
@@ -451,56 +480,60 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
             </div>
 
             {/* Search and File Upload - Aligned with Editor */}
-            <div className="flex gap-4 items-center justify-center mb-4">
-              <div className="relative flex-1 max-w-lg">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Search JSON... (Ctrl+H)"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 transition-all focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-                className="hidden"
-              />
-              
-              <Button 
-                onClick={() => fileInputRef.current?.click()} 
-                variant="outline" 
-                className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
-              >
-                <Upload className="h-4 w-4" />
-                <span className="hidden sm:inline">Upload File</span>
-              </Button>
-            </div>
-
-            {/* Search Results - Aligned with Editor */}
-            {searchTerm && searchResults.length > 0 && (
-              <div className="bg-muted/50 rounded-lg p-3 max-w-[600px] mx-auto">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Found {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
-                </p>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {searchResults.slice(0, 5).map((result, index) => (
-                    <div key={index} className="text-sm font-mono p-2 bg-background rounded border">
-                      <span className="text-muted-foreground">{result.path}:</span>
-                      <span className="ml-2">{typeof result.value === 'string' ? `"${result.value}"` : String(result.value)}</span>
-                    </div>
-                  ))}xd
-                  {searchResults.length > 5 && (
-                    <p className="text-xs text-muted-foreground px-2">
-                      ... and {searchResults.length - 5} more
-                    </p>
-                  )}
+            {viewMode !== 'diff' && (
+              <>
+                <div className="flex gap-4 items-center justify-center mb-4">
+                  <div className="relative flex-1 max-w-lg">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      ref={searchInputRef}
+                      placeholder="Search JSON... (Ctrl+H)"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 transition-all focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                    className="hidden"
+                  />
+                  
+                  <Button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    variant="outline" 
+                    className="flex items-center gap-2 hover:bg-primary/10 transition-colors"
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span className="hidden sm:inline">Upload File</span>
+                  </Button>
                 </div>
-              </div>
+
+                {/* Search Results - Aligned with Editor */}
+                {searchTerm && searchResults.length > 0 && (
+                  <div className="bg-muted/50 rounded-lg p-3 max-w-[600px] mx-auto">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Found {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
+                    </p>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {searchResults.slice(0, 5).map((result, index) => (
+                        <div key={index} className="text-sm font-mono p-2 bg-background rounded border">
+                          <span className="text-muted-foreground">{result.path}:</span>
+                          <span className="ml-2">{typeof result.value === 'string' ? `"${result.value}"` : String(result.value)}</span>
+                        </div>
+                      ))}
+                      {searchResults.length > 5 && (
+                        <p className="text-xs text-muted-foreground px-2">
+                          ... and {searchResults.length - 5} more
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             {/* Status Bar */}
             <div className="flex items-center justify-between mb-6 p-4 bg-muted/30 rounded-lg border">
@@ -703,7 +736,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                       {/* Left Editor */}
                       <div className="flex-1 flex flex-col">
                         <div className="flex items-center justify-between mb-3 px-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 p-1">
                             <FileText className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm font-medium text-muted-foreground">Original</span>
                           </div>
@@ -755,7 +788,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                       {/* Right Editor */}
                       <div className="flex-1 flex flex-col">
                         <div className="flex items-center justify-between mb-3 px-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 p-1">
                             <FileCheck className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm font-medium text-muted-foreground">Modified</span>
                           </div>
