@@ -346,6 +346,17 @@ export async function parseJSONFile(file: File): Promise<{ data: any; error: JSO
 /**
  * Get keyboard shortcuts
  */
+// Detect if the user is on a Mac
+const isMac = typeof navigator !== 'undefined' ? /Mac|iPod|iPhone|iPad/.test(navigator.platform) : false;
+
+// Get the correct modifier key based on the user's OS
+export const getModifierKey = () => isMac ? '⌘' : 'Ctrl';
+
+// Get the full shortcut text for a given shortcut key
+export const getShortcutText = (key: string) => {
+  return `${getModifierKey()}+${key.toUpperCase()}`;
+};
+
 export const KEYBOARD_SHORTCUTS = {
   FORMAT: { ctrl: true, key: 'f', description: 'Format JSON' },
   MINIFY: { ctrl: true, key: 'm', description: 'Minify JSON' },
@@ -357,10 +368,43 @@ export const KEYBOARD_SHORTCUTS = {
 
 /**
  * Check if keyboard shortcut matches
+ * Handles both ctrl (Windows/Linux) and cmd (Mac) keys
+ * Respects Monaco editor's default behavior
  */
 export function isShortcut(event: KeyboardEvent, shortcut: typeof KEYBOARD_SHORTCUTS[keyof typeof KEYBOARD_SHORTCUTS]): boolean {
+  // Don't trigger if any text is selected (allows text selection with Shift+Arrow keys)
+  if (window.getSelection()?.toString().length > 0) {
+    return false;
+  }
+
+  // Check if we're in an input or textarea
+  const target = event.target as HTMLElement;
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+  
+  // If we're in an input/textarea but not in the Monaco editor, don't trigger
+  if (isInput && !(target as any).__isMonacoEditor) {
+    return false;
+  }
+
+  // Check if we're in Monaco editor
+  const isMonacoEditor = (target as any).__isMonacoEditor;
+  
+  // If we're in Monaco editor, only trigger for specific non-standard shortcuts
+  if (isMonacoEditor) {
+    // Allow standard editor shortcuts to work
+    const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f', 'h'];
+    if (standardShortcuts.includes(shortcut.key.toLowerCase()) && 
+        (event.ctrlKey || event.metaKey)) {
+      return false;
+    }
+  }
+
+  // Check the actual shortcut
+  const modifierPressed = event.ctrlKey || event.metaKey;
   return (
-    event.ctrlKey === shortcut.ctrl &&
-    event.key.toLowerCase() === shortcut.key
+    modifierPressed &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === shortcut.key.toLowerCase()
   );
 }
