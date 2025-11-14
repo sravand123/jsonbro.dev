@@ -406,7 +406,18 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         <div className="container mx-auto px-4 py-4 relative">
           <div className="flex justify-center">
             <div className="text-center">
-              <h1 className="text-2xl font-bold">🧩JsonBro.Dev</h1>
+              <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+                <img 
+                  src="/icon.svg" 
+                  alt="JSON Icon" 
+                  className="w-6 h-6"
+                  style={{
+                    filter: 'drop-shadow(0 0 5px rgba(34, 197, 94, 0.5))',
+                    transition: 'filter 0.2s ease-in-out'
+                  }}
+                />
+                <span>JsonBro.Dev</span>
+              </h1>
               <p className="text-sm text-muted-foreground">Handle JSON like a pro, bro!!</p>
             </div>
           </div>
