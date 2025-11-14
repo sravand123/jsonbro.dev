@@ -16,22 +16,24 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
   const internalEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<typeof monaco | null>(null);
 
-  // Extract all strings from JSON content and break them into words
+  /**
+   * Extracts unique words from JSON content for autocomplete suggestions
+   * Handles both valid JSON and malformed JSON content
+   */
   const extractExistingWords = (jsonContent: string): string[] => {
     const words = new Set<string>();
     
     try {
-      // Try to parse as valid JSON first
+      // First try to parse as valid JSON
       const parsed = JSON.parse(jsonContent);
       extractWordsFromObject(parsed, words);
     } catch (e) {
-      // If not valid JSON, extract strings using regex
+      // Fallback: Extract strings using regex for malformed JSON
       const stringMatches = jsonContent.match(/"([^"\\]*(\\.[^"\\]*)*)"/g);
       if (stringMatches) {
         stringMatches.forEach(match => {
-          const stringContent = match.slice(1, -1); // Remove quotes
+          const stringContent = match.slice(1, -1);
           if (stringContent.length > 0) {
-            // Split by spaces, punctuation, and other delimiters
             const wordParts = stringContent.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
             wordParts.forEach(word => words.add(word));
           }
@@ -42,33 +44,33 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     return Array.from(words);
   };
 
-  // Extract word chunks from strings for context
+  /**
+   * Extracts word chunks (1-3 words) from JSON content for better context-aware suggestions
+   */
   const extractWordChunks = (jsonContent: string): string[] => {
     const chunks = new Set<string>();
     
     try {
-      // Try to parse as valid JSON first
       const parsed = JSON.parse(jsonContent);
       extractChunksFromObject(parsed, chunks);
     } catch (e) {
-      // If not valid JSON, extract strings using regex
+      // Fallback for malformed JSON
       const stringMatches = jsonContent.match(/"([^"\\]*(\\.[^"\\]*)*)"/g);
       if (stringMatches) {
         stringMatches.forEach(match => {
-          const stringContent = match.slice(1, -1); // Remove quotes
+          const stringContent = match.slice(1, -1);
           if (stringContent.length > 0) {
-            // Create different chunk sizes (2-3 words)
             const words = stringContent.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
             
-            // Single words (already covered by extractExistingWords)
+            // Add single words
             words.forEach(word => chunks.add(word));
             
-            // 2-word chunks
+            // Generate 2-word chunks
             for (let i = 0; i < words.length - 1; i++) {
               chunks.add(`${words[i]} ${words[i + 1]}`);
             }
             
-            // 3-word chunks (if available)
+            // Generate 3-word chunks
             for (let i = 0; i < words.length - 2; i++) {
               chunks.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
             }
@@ -80,21 +82,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     return Array.from(chunks);
   };
 
-  // Recursively extract strings from parsed JSON object
-  const extractStringsFromObject = (obj: any, strings: Set<string>) => {
-    if (obj === null || obj === undefined) return;
-    
-    if (typeof obj === 'string') {
-      strings.add(obj);
-    } else if (Array.isArray(obj)) {
-      obj.forEach(item => extractStringsFromObject(item, strings));
-    } else if (typeof obj === 'object') {
-      Object.keys(obj).forEach(key => {
-        strings.add(key);
-        extractStringsFromObject(obj[key], strings);
-      });
-    }
-  };
+  // Removed unused function: extractStringsFromObject
 
   // Recursively extract words from parsed JSON object
   const extractWordsFromObject = (obj: any, words: Set<string>) => {
@@ -554,9 +542,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'v', 'w', 'x', 'y', 'z',
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
         // Underscore
-        '_',
-        // Useful symbols for JSON (excluding $, comma, full stop, and double quotes)
-        ':', "'", '-', '+', '=', '<', '>', '/', '\\', '|', '[', ']', '{', '}', '(', ')', '!', '@', '#', '%', '^', '&', '*', '~', '`'
+        '_'
       ]
     });
 
