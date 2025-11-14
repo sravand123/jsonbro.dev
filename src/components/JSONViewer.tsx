@@ -56,6 +56,9 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [showDiff, setShowDiff] = useState(false);
   const leftEditorRef = useRef<any>(null);
   const rightEditorRef = useRef<any>(null);
+  const diffEditorRef = useRef<any>(null);
+  const [currentDiffIndex, setCurrentDiffIndex] = useState<number>(-1);
+  const [totalDiffs, setTotalDiffs] = useState<number>(0);
   // Load saved input from localStorage on mount
   const [input, setInput] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -112,6 +115,40 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       setToasts(prev => prev.filter(toast => toast.id !== id));
     }, 3000);
   }, []);
+
+  // Handle diff navigation
+  const navigateDiff = useCallback((direction: 'next' | 'previous') => {
+    if (!diffEditorRef.current) return;
+    
+    const diffEditor = diffEditorRef.current;
+    const model = diffEditor.getModel();
+    if (!model) return;
+    
+    const lineChanges = diffEditor.getLineChanges() || [];
+    if (lineChanges.length === 0) return;
+    
+    // Calculate the next index
+    let nextIndex = direction === 'next' 
+      ? (currentDiffIndex + 1) % lineChanges.length
+      : (currentDiffIndex - 1 + lineChanges.length) % lineChanges.length;
+    
+    const change = lineChanges[nextIndex];
+    if (!change) return;
+    
+    // Scroll to the change in both editors
+    diffEditor.revealLineInCenter(change.originalStartLineNumber, 1); // 1 = center
+    diffEditor.revealLineInCenter(change.modifiedStartLineNumber, 1);
+    
+    // Set the cursor to the change
+    diffEditor.setPosition({
+      lineNumber: change.originalStartLineNumber,
+      column: 1
+    });
+    
+    // Update the diff indicator
+    setCurrentDiffIndex(nextIndex);
+    setTotalDiffs(lineChanges.length);
+  }, [currentDiffIndex]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -753,23 +790,92 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   <div className="flex flex-col gap-4">
                     {/* Diff Editor */}
                     <div className="relative border rounded-lg overflow-hidden shadow-sm bg-card" style={{ height: 600 }}>
-                      <DiffEditor
-                        height="600px"
-                        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-                        original={leftInput}
-                        modified={rightInput}
-                        language="json"
-                        options={{
-                          readOnly: true,
-                          fontSize: 14,
-                          lineHeight: 1.6,
-                          minimap: { enabled: true },
-                          renderSideBySide: true,
-                          scrollBeyondLastLine: false,
-                          wordWrap: 'on',
-                        }}
-                        loading={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}
-                      />
+                      <div className="relative h-full">
+                        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-center gap-4 p-2 bg-card/80 backdrop-blur-sm border-b">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="hidden sm:inline">Navigate:</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigateDiff('previous')}
+                              className="h-7 px-2 gap-1"
+                              title="Previous difference (Alt+Left)"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m15 18-6-6 6-6"/>
+                              </svg>
+                              <span className="hidden sm:inline">Previous</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigateDiff('next')}
+                              className="h-7 px-2 gap-1"
+                              title="Next difference (Alt+Right)"
+                            >
+                              <span className="hidden sm:inline">Next</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m9 18 6-6-6-6"/>
+                              </svg>
+                            </Button>
+                            <div className="text-xs text-muted-foreground ml-2 hidden md:flex items-center gap-2">
+                              <span>{totalDiffs > 0 ? `${currentDiffIndex + 1} of ${totalDiffs} changes` : 'No changes'}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="h-full pt-10">
+                          <DiffEditor
+                            height="100%"
+                            theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+                            original={leftInput}
+                            modified={rightInput}
+                            language="json"
+                            onMount={(editor) => {
+                              diffEditorRef.current = editor;
+                              
+                              // Set up a small delay to ensure the editor is fully initialized
+                              setTimeout(() => {
+                                const lineChanges = editor.getLineChanges() || [];
+                                setTotalDiffs(lineChanges.length);
+                                
+                                // Navigate to first diff if there are any
+                                if (lineChanges.length > 0) {
+                                  setCurrentDiffIndex(0);
+                                  const firstChange = lineChanges[0];
+                                  editor.revealLineInCenter(firstChange.originalStartLineNumber, 1);
+                                  editor.revealLineInCenter(firstChange.modifiedStartLineNumber, 1);
+                                  editor.setPosition({
+                                    lineNumber: firstChange.originalStartLineNumber,
+                                    column: 1
+                                  });
+                                }
+                              }, 100);
+                            }}
+                            options={{
+                              readOnly: true,
+                              fontSize: 14,
+                              lineHeight: 1.6,
+                              minimap: { enabled: true },
+                              renderSideBySide: true,
+                              scrollBeyondLastLine: false,
+                              wordWrap: 'on',
+                              renderIndentGuides: true,
+                              renderWhitespace: 'selection',
+                              renderLineHighlight: 'all',
+                              automaticLayout: true,
+                              folding: true,
+                              foldingHighlight: true,
+                              showFoldingControls: 'always',
+                              bracketPairColorization: { enabled: true },
+                              guides: {
+                                bracketPairs: true,
+                                indentation: true
+                              }
+                            }}
+                            loading={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
