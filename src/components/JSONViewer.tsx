@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type { editor } from 'monaco-editor';
 import { 
   Download, 
   Upload, 
@@ -71,13 +72,15 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [isDragOver, setIsDragOver] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<JSONNode[]>([]);
+  const [activeSearchResult, setActiveSearchResult] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [editorInstance, setEditorInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [viewMode, setViewMode] = useState<'formatted' | 'diff'>('formatted');
   const [isFormatting, setIsFormatting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Passive validation - only for status indicators, doesn't interrupt editing
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
@@ -215,10 +218,111 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [input]);
 
+  // Handle editor mount
+  const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
+    // Store the editor instance in the ref
+    editorRef.current = editor;
+    setEditorInstance(editor);
+    
+    // Set up a small delay to ensure the editor is fully initialized
+    const timer = setTimeout(() => {
+      try {
+        // Focus the editor and set cursor to the beginning
+        editor.focus();
+        editor.setPosition({ lineNumber: 1, column: 1 });
+      } catch (error) {
+        console.error('Error focusing editor:', error);
+      }
+    }, 100);
+    
+    // Clean up the timer if the component unmounts
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle search result click
+  const handleSearchResultClick = useCallback((result: JSONNode, index: number) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    
+    setActiveSearchResult(index);
+    
+    try {
+      const model = editor.getModel();
+      if (!model) return;
+      
+      // Get the JSON string and the value to search for
+      const jsonString = model.getValue();
+      
+      // Convert the path to a string representation that can be found in the JSON
+      // The path is already a string in the format 'root.property.subproperty'
+      const pathString = result.path.replace(/^root\.?/, ''); // Remove 'root.' prefix if it exists
+      const valueString = typeof result.value === 'string' ? `"${result.value}"` : String(result.value);
+      
+      // Find the position of the value in the JSON string
+      // First, try to find the exact match with the full path
+      let searchPattern = new RegExp(`"${escapeRegExp(pathString)}"\\s*:\\s*${escapeRegExp(valueString)}`, 'g');
+      let match;
+      let matchIndex = 0;
+      let foundPosition = -1;
+      
+      // Find the nth occurrence that matches our search
+      while ((match = searchPattern.exec(jsonString)) !== null) {
+        if (matchIndex === index) {
+          foundPosition = match.index;
+          break;
+        }
+        matchIndex++;
+      }
+      
+      // If not found with full path, try with just the value
+      if (foundPosition === -1) {
+        searchPattern = new RegExp(escapeRegExp(valueString), 'g');
+        matchIndex = 0;
+        
+        while ((match = searchPattern.exec(jsonString)) !== null) {
+          if (matchIndex === index) {
+            foundPosition = match.index;
+            break;
+          }
+          matchIndex++;
+        }
+      }
+      
+      if (foundPosition === -1) return;
+      
+      // Get the position in the editor
+      const startPos = model.getPositionAt(foundPosition);
+      const endPos = model.getPositionAt(foundPosition + valueString.length);
+      
+      // Reveal the line and set the cursor position
+      editor.revealLineInCenter(startPos.lineNumber);
+      editor.setPosition(startPos);
+      
+      // Set the selection to highlight the match
+      editor.setSelection({
+        startLineNumber: startPos.lineNumber,
+        startColumn: startPos.column,
+        endLineNumber: endPos.lineNumber,
+        endColumn: endPos.column
+      });
+      
+      // Focus the editor
+      editor.focus();
+    } catch (error) {
+      console.error('Error navigating to search result:', error);
+    }
+  }, []);
+
+  // Helper function to escape special regex characters
+  const escapeRegExp = (string: string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+
   // Search functionality
   useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
+      setActiveSearchResult(null);
       return;
     }
 
@@ -600,7 +704,15 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                     </p>
                     <div className="max-h-32 overflow-y-auto space-y-1">
                       {searchResults.slice(0, 5).map((result, index) => (
-                        <div key={index} className="text-sm font-mono p-2 bg-background rounded border">
+                        <div 
+                          key={index} 
+                          className={`text-sm font-mono p-2 rounded border cursor-pointer transition-colors ${
+                            activeSearchResult === index 
+                              ? 'bg-primary/10 border-primary' 
+                              : 'bg-background hover:bg-muted/50'
+                          }`}
+                          onClick={() => handleSearchResultClick(result, index)}
+                        >
                           <span className="text-muted-foreground">{result.path}:</span>
                           <span className="ml-2">{typeof result.value === 'string' ? `"${result.value}"` : String(result.value)}</span>
                         </div>
@@ -1001,6 +1113,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                       indentation: true
                     }
                   }}
+                  onMount={handleEditorDidMount}
                 />
               )}
             </div>

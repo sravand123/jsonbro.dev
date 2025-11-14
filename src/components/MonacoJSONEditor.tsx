@@ -8,10 +8,11 @@ interface MonacoJSONEditorProps {
   theme: string;
   height?: string;
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
+  onMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void;
 }
 
 export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor | null, MonacoJSONEditorProps>((
-  { value, onChange, theme, height = '400px', options = {} }, ref
+  { value, onChange, theme, height = '400px', options = {}, onMount }, ref
 ) => {
   const internalEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<typeof monaco | null>(null);
@@ -372,6 +373,11 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     internalEditorRef.current = editor;
     setMonacoInstance(monaco);
+    
+    // Call the onMount prop if provided
+    if (onMount) {
+      onMount(editor);
+    }
 
     // Mark the editor element so keyboard shortcuts can identify it
     const editorDomNode = editor.getDomNode();
@@ -701,10 +707,16 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     scrollBeyondLastLine: false,
     fontSize: 14,
     lineHeight: 1.6,
+    minimap: { enabled: true },
+    showFoldingControls: 'always',
+    bracketPairColorization: { enabled: true },
+    guides: {
+      bracketPairs: true,
+      indentation: true
+    },
     fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', Monaco, Consolas, 'Courier New', monospace",
     fontLigatures: true,
     lineNumbers: 'on',
-    minimap: { enabled: true },
     contextmenu: true,
     mouseWheelZoom: true,
     matchBrackets: 'always',
