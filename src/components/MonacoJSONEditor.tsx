@@ -154,12 +154,13 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     }
   };
 
-  // Enhanced suggestions including words and chunks from JSON content
+  // Enhanced suggestions including words and chunks from JSON content with better deduplication
   const getWordBasedSuggestions = (context: { text: string; path: string[]; isValue: boolean; insideQuotes: boolean }, existingWords: string[], existingChunks: string[]) => {
     const inputText = context.text;
     const suggestions: any[] = [];
     const processedSuggestions = new Set<string>(); // Track to avoid duplicates
     const allWords = new Set<string>(); // Track all words for better deduplication
+    const lowercaseToOriginal = new Map<string, string>(); // Map lowercase to original case
     
     // Use the insideQuotes flag from context
     const shouldAddQuotes = !context.insideQuotes;
@@ -184,41 +185,61 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     // Add word suggestions from JSON content with better deduplication
     existingWords.forEach(word => {
       if (word && word.length > 0 && word.length < 50) { // Filter very long words
+        const lowerWord = word.toLowerCase();
+        
+        // Track original case, preferring longer versions of the same word
+        if (lowercaseToOriginal.has(lowerWord)) {
+          const existing = lowercaseToOriginal.get(lowerWord)!;
+          if (word.length > existing.length) {
+            lowercaseToOriginal.set(lowerWord, word);
+          }
+        } else {
+          lowercaseToOriginal.set(lowerWord, word);
+        }
+        
         // Check if this word partially matches the input
-        if (!inputText || word.toLowerCase().includes(inputText.toLowerCase())) {
+        if (!inputText || lowerWord.includes(inputText.toLowerCase())) {
           // Skip common words unless they exactly match the input
-          if (!commonWords.has(word.toLowerCase()) || (inputText && word.toLowerCase() === inputText.toLowerCase())) {
+          if (!commonWords.has(lowerWord) || (inputText && lowerWord === inputText.toLowerCase())) {
+            const displayWord = lowercaseToOriginal.get(lowerWord) || word;
             const suggestion = shouldAddQuotes
               ? {
-                  label: `"${word}"`,
+                  label: `"${displayWord}"`,
                   kind: monaco.languages.CompletionItemKind.Value,
-                  insertText: `"${word}"`,
-                  documentation: `Use quoted word: "${word}"`
+                  insertText: `"${displayWord}"`,
+                  documentation: `Use quoted word: "${displayWord}"`
                 }
               : {
-                  label: word,
+                  label: displayWord,
                   kind: monaco.languages.CompletionItemKind.Variable,
-                  insertText: word,
-                  documentation: `Use word: "${word}"`
+                  insertText: displayWord,
+                  documentation: `Use word: "${displayWord}"`
                 };
 
-            const suggestionKey = suggestion.insertText;
+            const suggestionKey = suggestion.insertText.toLowerCase();
             if (!processedSuggestions.has(suggestionKey)) {
               suggestions.push(suggestion);
               processedSuggestions.add(suggestionKey);
-              allWords.add(word.toLowerCase());
+              allWords.add(lowerWord);
             }
           }
         }
       }
     });
     
+    // Process chunks with deduplication
+    const processedChunks = new Set<string>();
+    
     // Add chunk suggestions from JSON content (only if they match input and are unique)
     existingChunks.forEach(chunk => {
       if (chunk && chunk.length > 0 && chunk.length < 100) { // Filter very long chunks
+        const lowerChunk = chunk.toLowerCase();
+        if (processedChunks.has(lowerChunk)) return;
+        processedChunks.add(lowerChunk);
+        
         const chunkWords = chunk.split(' ').filter(word => word.length > 0);
         // Only suggest chunks if they contain multiple words or the entire chunk matches the input
-        if (chunkWords.length > 1 && (!inputText || chunk.toLowerCase().includes(inputText.toLowerCase()))) {
+        if (chunkWords.length > 1 && (!inputText || lowerChunk.includes(inputText.toLowerCase()))) {
           // Additional deduplication: ensure chunk doesn't already exist as individual words
           const chunkAlreadyExists = chunkWords.every(word => allWords.has(word.toLowerCase()));
           
@@ -228,16 +249,18 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
                   label: `"${chunk}"`,
                   kind: monaco.languages.CompletionItemKind.Value,
                   insertText: `"${chunk}"`,
-                  documentation: `Use quoted chunk: "${chunk}"`
+                  documentation: `Use quoted chunk: "${chunk}"`,
+                  sortText: `1${chunk}` // Sort after single words
                 }
               : {
                   label: chunk,
                   kind: monaco.languages.CompletionItemKind.Variable,
                   insertText: chunk,
-                  documentation: `Use word chunk: "${chunk}"`
+                  documentation: `Use word chunk: "${chunk}"`,
+                  sortText: `1${chunk}` // Sort after single words
                 };
 
-            const suggestionKey = suggestion.insertText;
+            const suggestionKey = suggestion.insertText.toLowerCase();
             if (!processedSuggestions.has(suggestionKey)) {
               suggestions.push(suggestion);
               processedSuggestions.add(suggestionKey);
