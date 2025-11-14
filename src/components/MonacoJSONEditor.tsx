@@ -379,17 +379,140 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       (editorDomNode as any).__isMonacoEditor = true;
     }
 
-    // Disable all JSON schema features and validations
+    // Enable JSON validation with custom settings
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-      validate: false, // Disable validation to prevent schema suggestions
+      validate: true, // Enable validation
       allowComments: false,
       trailingCommas: 'error',
-      comments: 'ignore',
-      schemas: [], // Disable all JSON schemas
-      enableSchemaRequest: false, // Prevent schema fetching
-      schemaRequest: 'ignore', // Ignore schema requests
-      schemaValidation: 'ignore', // Disable schema validation
+      comments: 'error',
+      schemas: [],
+      enableSchemaRequest: false,
+      schemaRequest: 'error',
+      schemaValidation: 'error',
     });
+
+    // Configure the editor to show validation errors
+    const model = editor.getModel();
+    if (model) {
+      // Set the language to JSON
+      monaco.editor.setModelLanguage(model, 'json');
+      
+      // Add custom validation for JSON syntax errors
+      const validate = () => {
+        const content = model.getValue();
+        const markers: monaco.editor.IMarkerData[] = [];
+        
+        try {
+          // First, try to parse the JSON
+          JSON.parse(content);
+          // If we get here, the JSON is valid - clear any existing markers
+          monaco.editor.setModelMarkers(model, 'json', []);
+          return;
+        } catch (e) {
+          if (e instanceof SyntaxError) {
+            // Get the position from the error message
+            const positionMatch = e.message.match(/at position (\d+)/);
+            if (positionMatch) {
+              const errorPosition = parseInt(positionMatch[1], 10);
+              const position = model.getPositionAt(errorPosition);
+              const lineNumber = position.lineNumber;
+              let column = position.column;
+              const lineContent = model.getLineContent(lineNumber);
+              
+              // Check if the error is likely a missing comma
+              const isMissingComma = e.message.includes('Unexpected token') || 
+                                   e.message.includes('Expected');
+              
+              if (isMissingComma) {
+                // For missing commas, we want to highlight the end of the previous line
+                if (column <= 1 && lineNumber > 1) {
+                  // Find the previous non-empty line
+                  let prevLineNum = lineNumber - 1;
+                  while (prevLineNum > 0 && model.getLineContent(prevLineNum).trim() === '') {
+                    prevLineNum--;
+                  }
+                  
+                  if (prevLineNum > 0) {
+                    const prevLine = model.getLineContent(prevLineNum);
+                    const trimmedLine = prevLine.trim();
+                    
+                    // Only add marker if the previous line ends with a value (not a closing bracket/brace)
+                    if (trimmedLine.length > 0 && !/[\]}{]\s*$/.test(trimmedLine)) {
+                      // Find the last non-whitespace character
+                      let lastCharPos = prevLine.length;
+                      while (lastCharPos > 0 && /\s/.test(prevLine[lastCharPos - 1])) {
+                        lastCharPos--;
+                      }
+                      
+                      if (lastCharPos > 0) {
+                        markers.push({
+                          severity: monaco.MarkerSeverity.Error,
+                          message: 'Missing comma after this element',
+                          startLineNumber: prevLineNum,
+                          startColumn: lastCharPos,
+                          endLineNumber: prevLineNum,
+                          endColumn: lastCharPos + 1
+                        });
+                      }
+                    }
+                  }
+                } else {
+                  // For errors in the middle of the line, try to find the token boundaries
+                  const lineStart = model.getOffsetAt({ lineNumber, column: 1 });
+                  const relativePos = errorPosition - lineStart;
+                  
+                  // Look for the start of the token
+                  let startColumn = Math.max(1, column);
+                  for (let i = relativePos - 1; i >= 0; i--) {
+                    if (/[\s\n\r,{}\[\]]/.test(lineContent[i])) break;
+                    startColumn = i + 1;
+                  }
+                  
+                  // Look for the end of the token
+                  let endColumn = Math.min(lineContent.length + 1, column + 1);
+                  for (let i = relativePos; i < lineContent.length; i++) {
+                    if (/[\s\n\r,{}\[\]]/.test(lineContent[i])) break;
+                    endColumn = i + 2;
+                  }
+                  
+                  markers.push({
+                    severity: monaco.MarkerSeverity.Error,
+                    message: e.message,
+                    startLineNumber: lineNumber,
+                    startColumn: startColumn,
+                    endLineNumber: lineNumber,
+                    endColumn: endColumn
+                  });
+                }
+              } else {
+                // For other types of errors, just use the position from the error
+                markers.push({
+                  severity: monaco.MarkerSeverity.Error,
+                  message: e.message,
+                  startLineNumber: lineNumber,
+                  startColumn: column,
+                  endLineNumber: lineNumber,
+                  endColumn: column + 1
+                });
+              }
+            }
+          }
+        }
+        
+        // Set the markers
+        monaco.editor.setModelMarkers(model, 'json', markers);
+      };
+
+      // Validate on content change with debounce
+      let timeoutId: NodeJS.Timeout;
+      model.onDidChangeContent(() => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(validate, 300); // Debounce validation
+      });
+
+      // Initial validation
+      validate();
+    }
 
     // Remove the default JSON mode provider to prevent built-in suggestions
     monaco.languages.json.jsonDefaults.setModeConfiguration({
