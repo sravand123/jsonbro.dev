@@ -591,7 +591,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 />
                 <span>JsonBro.Dev</span>
               </h1>
-              <p className="text-sm text-muted-foreground">Handle JSON like a pro, bro!!</p>
+              <p className="text-sm text-muted-foreground">Your bro for JSON formatting</p>
             </div>
           </div>
           <div className="absolute right-4 top-1/2 -translate-y-1/2">
