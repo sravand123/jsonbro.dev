@@ -175,24 +175,29 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         current = current.parentElement;
       }
 
-      // If we're in Monaco editor, only handle specific non-standard shortcuts
+      // If we're in Monaco editor, allow our custom shortcuts and block standard ones
       if (isMonacoEditor) {
-        // Allow standard editor shortcuts to work
-        const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f', 'h'];
-        if (standardShortcuts.includes(event.key.toLowerCase()) && 
-            (event.ctrlKey || event.metaKey)) {
-          return;
-        }
-        
-        // For other shortcuts in Monaco, only proceed if they're our custom shortcuts
-        const isOurShortcut = Object.values(KEYBOARD_SHORTCUTS).some(shortcut => 
+        // Check if this matches one of our custom shortcuts
+        const matchedShortcut = Object.values(KEYBOARD_SHORTCUTS).find(shortcut => 
           (event.ctrlKey || event.metaKey) && 
           !event.altKey && 
-          !event.shiftKey && 
-          event.key.toLowerCase() === shortcut.key
+          event.shiftKey === ((shortcut as any).shift || false) &&
+          (shortcut.key === 'delete' 
+            ? (event.key === 'Delete' || event.key === 'Backspace')
+            : event.key.toLowerCase() === shortcut.key.toLowerCase())
         );
         
-        if (!isOurShortcut) {
+        // If it's one of our shortcuts, allow it to proceed
+        if (matchedShortcut) {
+          // Continue to the shortcut handling below
+        } else {
+          // For standard shortcuts (copy, paste, etc.), let Monaco handle them
+          const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f'];
+          if (standardShortcuts.includes(event.key.toLowerCase()) && 
+              (event.ctrlKey || event.metaKey)) {
+            return; // Let Monaco handle these
+          }
+          // For other key combinations, don't handle them
           return;
         }
       }
@@ -620,7 +625,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   <CheckCircle className="h-4 w-4" />
                 )}
                 <span className="hidden sm:inline">Format</span>
-                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.FORMAT.key)})</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.FORMAT)})</span>
               </Button>
               
               <Button 
@@ -635,7 +640,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   <FileText className="h-4 w-4" />
                 )}
                 <span className="hidden sm:inline">Minify</span>
-                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.MINIFY.key)})</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.MINIFY)})</span>
               </Button>
               
               <Button 
@@ -646,7 +651,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               >
                 <Copy className="h-4 w-4" />
                 <span className="hidden sm:inline">Copy</span>
-                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.COPY.key)})</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.COPY)})</span>
               </Button>
               
               <Button 
@@ -657,7 +662,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Save</span>
-                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.SAVE.key)})</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.SAVE)})</span>
               </Button>
               
               <Button 
@@ -668,7 +673,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Clear</span>
-                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.CLEAR.key)})</span>
+                <span className="text-xs text-muted-foreground hidden md:inline">({getShortcutText(KEYBOARD_SHORTCUTS.CLEAR)})</span>
               </Button>
             </div>
 
@@ -680,7 +685,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       ref={searchInputRef}
-                      placeholder={`Search JSON... (${getShortcutText(KEYBOARD_SHORTCUTS.SEARCH.key)})`}
+                      placeholder={`Search JSON... (${getShortcutText(KEYBOARD_SHORTCUTS.SEARCH)})`}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 transition-all focus:ring-2 focus:ring-primary/20"

@@ -352,16 +352,19 @@ const isMac = typeof navigator !== 'undefined' ? /Mac|iPod|iPhone|iPad/.test(nav
 // Get the correct modifier key based on the user's OS
 export const getModifierKey = () => isMac ? '⌘' : 'Ctrl';
 
-// Get the full shortcut text for a given shortcut key
-export const getShortcutText = (key: string) => {
-  return `${getModifierKey()}+${key.toUpperCase()}`;
+// Get the full shortcut text for a given shortcut object
+export const getShortcutText = (shortcut: typeof KEYBOARD_SHORTCUTS[keyof typeof KEYBOARD_SHORTCUTS]) => {
+  const modifier = getModifierKey();
+  const shift = (shortcut as any).shift ? 'Shift+' : '';
+  const key = shortcut.key === 'delete' ? 'Del' : shortcut.key.toUpperCase();
+  return `${modifier}+${shift}${key}`;
 };
 
 export const KEYBOARD_SHORTCUTS = {
-  FORMAT: { ctrl: true, key: 'f', description: 'Format JSON' },
+  FORMAT: { ctrl: true, shift: true, key: 'f', description: 'Format JSON' },
   MINIFY: { ctrl: true, key: 'm', description: 'Minify JSON' },
-  COPY: { ctrl: true, key: 'c', description: 'Copy to clipboard' },
-  CLEAR: { ctrl: true, key: 'k', description: 'Clear input' },
+  COPY: { ctrl: true, shift: true, key: 'c', description: 'Copy to clipboard' },
+  CLEAR: { ctrl: true, shift: true, key: 'delete', description: 'Clear input' },
   SEARCH: { ctrl: true, key: 'h', description: 'Focus search' },
   SAVE: { ctrl: true, key: 's', description: 'Download JSON' }
 } as const;
@@ -389,22 +392,44 @@ export function isShortcut(event: KeyboardEvent, shortcut: typeof KEYBOARD_SHORT
   // Check if we're in Monaco editor
   const isMonacoEditor = (target as any).__isMonacoEditor;
   
-  // If we're in Monaco editor, only trigger for specific non-standard shortcuts
+  // If we're in Monaco editor, allow our custom shortcuts and block standard ones
   if (isMonacoEditor) {
-    // Allow standard editor shortcuts to work
-    const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f', 'h'];
-    if (standardShortcuts.includes(shortcut.key.toLowerCase()) && 
-        (event.ctrlKey || event.metaKey)) {
+    // Check if this matches one of our custom shortcuts
+    const matchedShortcut = Object.values(KEYBOARD_SHORTCUTS).find(s => 
+      (event.ctrlKey || event.metaKey) && 
+      !event.altKey && 
+      event.shiftKey === ((s as any).shift || false) &&
+      (s.key === 'delete' 
+        ? (event.key === 'Delete' || event.key === 'Backspace')
+        : event.key.toLowerCase() === s.key.toLowerCase())
+    );
+    
+    // If it's one of our shortcuts, allow it to proceed
+    if (matchedShortcut && matchedShortcut.key === shortcut.key) {
+      // Continue to the shortcut checking below
+    } else {
+      // For standard shortcuts (copy, paste, etc.), let Monaco handle them
+      const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f'];
+      if (standardShortcuts.includes(shortcut.key.toLowerCase()) && 
+          (event.ctrlKey || event.metaKey)) {
+        return false; // Let Monaco handle these
+      }
+      // For other key combinations, don't handle them
       return false;
     }
   }
 
   // Check the actual shortcut
   const modifierPressed = event.ctrlKey || event.metaKey;
+  const shiftRequired = (shortcut as any).shift || false;
+  const keyMatches = shortcut.key === 'delete' 
+    ? (event.key === 'Delete' || event.key === 'Backspace')
+    : event.key.toLowerCase() === shortcut.key.toLowerCase();
+  
   return (
     modifierPressed &&
     !event.altKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === shortcut.key.toLowerCase()
+    event.shiftKey === shiftRequired &&
+    keyMatches
   );
 }
