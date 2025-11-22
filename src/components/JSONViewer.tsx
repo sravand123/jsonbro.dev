@@ -176,17 +176,31 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
   // Update editor options when settings change
   useEffect(() => {
-    if (editorRef.current) {
-      const actualFontSize = editorSettings.fontSize === 'auto'
-        ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
-        : editorSettings.fontSize;
+    const actualFontSize = editorSettings.fontSize === 'auto'
+      ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+      : editorSettings.fontSize;
 
-      editorRef.current.updateOptions({
-        tabSize: editorSettings.tabSize,
-        insertSpaces: true,
-        fontSize: actualFontSize,
-        lineHeight: editorSettings.lineHeight,
-      });
+    const options = {
+      tabSize: editorSettings.tabSize,
+      insertSpaces: true,
+      fontSize: actualFontSize,
+      lineHeight: editorSettings.lineHeight,
+    };
+
+    if (editorRef.current) {
+      editorRef.current.updateOptions(options);
+    }
+
+    if (leftEditorRef.current) {
+      leftEditorRef.current.updateOptions(options);
+    }
+
+    if (rightEditorRef.current) {
+      rightEditorRef.current.updateOptions(options);
+    }
+
+    if (diffEditorRef.current) {
+      diffEditorRef.current.updateOptions(options);
     }
   }, [editorSettings]);
 
@@ -1006,7 +1020,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                           onChange={(value) => setLeftInput(value || '')}
                           theme={theme}
                           height="100%"
-                          options={{ minimap: { enabled: false } }}
+                          options={{
+                            minimap: { enabled: false },
+                            fontSize: editorSettings.fontSize === 'auto'
+                              ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                              : editorSettings.fontSize,
+                            lineHeight: editorSettings.lineHeight,
+                            tabSize: editorSettings.tabSize,
+                          }}
                         />
                       </div>
                     </div>
@@ -1022,7 +1043,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                           onChange={(value) => setRightInput(value || '')}
                           theme={theme}
                           height="100%"
-                          options={{ minimap: { enabled: false } }}
+                          options={{
+                            minimap: { enabled: false },
+                            fontSize: editorSettings.fontSize === 'auto'
+                              ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                              : editorSettings.fontSize,
+                            lineHeight: editorSettings.lineHeight,
+                            tabSize: editorSettings.tabSize,
+                          }}
                         />
                       </div>
                     </div>
@@ -1048,7 +1076,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                     }}
                     options={{
                       readOnly: true,
-                      fontSize: 14,
+                      fontSize: editorSettings.fontSize === 'auto'
+                        ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                        : editorSettings.fontSize,
+                      lineHeight: editorSettings.lineHeight,
                       renderSideBySide: true,
                       fontFamily: 'JetBrains Mono, monospace',
                     }}
