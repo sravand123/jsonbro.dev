@@ -437,3 +437,45 @@ function parseCSV(csvString: string): any[] {
 }
 
 
+import { getLocation } from 'jsonc-parser';
+
+/**
+ * Get the JSON path at a specific character offset
+ */
+export function getJSONPathAtPosition(json: string, offset: number): string {
+  if (!json || offset < 0 || offset > json.length) return '';
+
+  try {
+    const location = getLocation(json, offset);
+    const path = location.path;
+
+    if (!path || path.length === 0) return '';
+
+    let result = '';
+    for (let i = 0; i < path.length; i++) {
+      const segment = path[i];
+
+      if (typeof segment === 'number') {
+        result += `[${segment}]`;
+      } else {
+        // Check if the segment is a valid JavaScript identifier
+        // If it is, we can use dot notation. Otherwise, use bracket notation.
+        // Valid identifier: starts with letter, _, $; followed by letters, numbers, _, $
+        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment)) {
+          if (result.length > 0) {
+            result += '.';
+          }
+          result += segment;
+        } else {
+          // Use bracket notation for non-identifiers (including empty strings)
+          result += `['${segment}']`;
+        }
+      }
+    }
+
+    return result;
+  } catch (e) {
+    console.error('Error getting JSON path:', e);
+    return '';
+  }
+}

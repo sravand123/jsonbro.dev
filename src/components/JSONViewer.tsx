@@ -103,6 +103,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [isFormatting, setIsFormatting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [currentPath, setCurrentPath] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -950,6 +951,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   wordWrap: 'on',
                 }}
                 onMount={handleEditorDidMount}
+                onPathChange={setCurrentPath}
               />
 
 
@@ -1121,6 +1123,12 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
             <span>{new TextEncoder().encode(input).length} bytes</span>
             <div className="w-px h-3 bg-border" />
             <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+            {currentPath && (
+              <>
+                <div className="w-px h-3 bg-border" />
+                <span className="text-primary truncate max-w-[300px]" title={currentPath}>{currentPath}</span>
+              </>
+            )}
             <div className="w-px h-3 bg-border" />
             <span>UTF-8</span>
           </div>

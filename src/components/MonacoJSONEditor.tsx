@@ -12,10 +12,13 @@ interface MonacoJSONEditorProps {
   height?: string;
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
   onMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void;
+  onPathChange?: (path: string) => void;
 }
 
+import { getJSONPathAtPosition } from '../utils/jsonUtils';
+
 export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor | null, MonacoJSONEditorProps>((
-  { value, onChange, theme, height = '400px', options = {}, onMount }, ref
+  { value, onChange, theme, height = '400px', options = {}, onMount, onPathChange }, ref
 ) => {
   const internalEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<typeof monaco | null>(null);
@@ -419,6 +422,21 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     resizeListenerRef.current = () => {
       window.removeEventListener('resize', handleResize);
     };
+
+    // Track cursor position for JSON path
+    if (onPathChange) {
+      editor.onDidChangeCursorPosition((e) => {
+        const model = editor.getModel();
+        if (model) {
+          const offset = model.getOffsetAt(e.position);
+          const value = model.getValue();
+          // Debounce slightly to avoid performance hit on rapid movement
+          // But for now direct call is fine as the parser is O(N) and fast for reasonable files
+          const path = getJSONPathAtPosition(value, offset);
+          onPathChange(path);
+        }
+      });
+    }
 
     // Enable JSON validation with custom settings
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
