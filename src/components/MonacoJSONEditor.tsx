@@ -19,6 +19,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
 ) => {
   const internalEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<typeof monaco | null>(null);
+  const resizeListenerRef = useRef<(() => void) | null>(null);
 
   /**
    * Extracts unique words from JSON content for autocomplete suggestions
@@ -26,7 +27,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
    */
   const extractExistingWords = (jsonContent: string): string[] => {
     const words = new Set<string>();
-    
+
     try {
       // First try to parse as valid JSON
       const parsed = JSON.parse(jsonContent);
@@ -44,7 +45,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         });
       }
     }
-    
+
     return Array.from(words);
   };
 
@@ -53,7 +54,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
    */
   const extractWordChunks = (jsonContent: string): string[] => {
     const chunks = new Set<string>();
-    
+
     try {
       const parsed = JSON.parse(jsonContent);
       extractChunksFromObject(parsed, chunks);
@@ -70,7 +71,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         });
       }
     }
-    
+
     return Array.from(chunks);
   };
 
@@ -79,7 +80,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
   // Recursively extract words from parsed JSON object
   const extractWordsFromObject = (obj: any, words: Set<string>) => {
     if (obj === null || obj === undefined) return;
-    
+
     if (typeof obj === 'string') {
       // Split into words by spaces and other delimiters
       const wordParts = obj.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
@@ -101,10 +102,10 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
   // Recursively extract chunks from parsed JSON object
   const extractChunksFromObject = (obj: any, chunks: Set<string>) => {
     if (obj === null || obj === undefined) return;
-    
+
     if (typeof obj === 'string') {
       const words = obj.split(/[\s,.;:!?()\[\]{}"'-]/g).filter(word => word.length > 0);
-      words.forEach(word => chunks.add(word));  
+      words.forEach(word => chunks.add(word));
     } else if (Array.isArray(obj)) {
       obj.forEach(item => extractChunksFromObject(item, chunks));
     } else if (typeof obj === 'object') {
@@ -124,10 +125,10 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     const allWords = new Set<string>(); // Track all words for better deduplication
     const lowercaseToOriginal = new Map<string, string>(); // Map lowercase to original case
     const existingSuggestions = new Set<string>(); // Track existing suggestions by label
-    
+
     // Use the insideQuotes flag from context
     const shouldAddQuotes = !context.insideQuotes;
-    
+
     // Add auto-quoted suggestion if needed and input exists
     if (shouldAddQuotes && inputText.length > 0) {
       const quotedVersion = `"${inputText}"`;
@@ -141,15 +142,15 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       processedSuggestions.add(quotedVersion);
       allWords.add(inputText);
     }
-    
+
     // Filter out common/generic words that don't add value
     const commonWords = new Set(['and', 'or', 'the', 'a', 'an', 'is', 'are', 'was', 'were', 'has', 'have', 'had', 'to', 'of', 'in', 'for', 'on', 'at', 'by', 'from', 'with', 'as', 'but', 'not', 'be', 'been', 'it', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'we', 'they']);
-    
+
     // Add word suggestions from JSON content with better deduplication
     existingWords.forEach(word => {
       if (word && word.length > 0 && word.length < 50) { // Filter very long words
         const lowerWord = word.toLowerCase();
-        
+
         // Track original case, preferring longer versions of the same word
         if (lowercaseToOriginal.has(lowerWord)) {
           const existing = lowercaseToOriginal.get(lowerWord)!;
@@ -159,7 +160,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         } else {
           lowercaseToOriginal.set(lowerWord, word);
         }
-        
+
         // Check if this word partially matches the input
         if (!inputText || lowerWord.includes(inputText.toLowerCase())) {
           // Skip common words unless they exactly match the input
@@ -167,69 +168,69 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
             const displayWord = lowercaseToOriginal.get(lowerWord) || word;
             const suggestion = shouldAddQuotes
               ? {
-                  label: `"${displayWord}"`,
-                  kind: monaco.languages.CompletionItemKind.Value,
-                  insertText: `"${displayWord}"`,
-                  documentation: `Use quoted word: "${displayWord}"`
-                }
+                label: `"${displayWord}"`,
+                kind: monaco.languages.CompletionItemKind.Value,
+                insertText: `"${displayWord}"`,
+                documentation: `Use quoted word: "${displayWord}"`
+              }
               : {
-                  label: displayWord,
-                  kind: monaco.languages.CompletionItemKind.Variable,
-                  insertText: displayWord,
-                  documentation: `Use word: "${displayWord}"`
-                };
+                label: displayWord,
+                kind: monaco.languages.CompletionItemKind.Variable,
+                insertText: displayWord,
+                documentation: `Use word: "${displayWord}"`
+              };
 
             const suggestionKey = suggestion.insertText.toLowerCase();
-          const suggestionLabel = suggestion.label.toLowerCase();
-          
-          // Check if we've already added this exact suggestion or a very similar one
-          if (!processedSuggestions.has(suggestionKey) && !existingSuggestions.has(suggestionLabel)) {
-            suggestions.push(suggestion);
-            processedSuggestions.add(suggestionKey);
-            existingSuggestions.add(suggestionLabel);
-            allWords.add(lowerWord);
-          }
+            const suggestionLabel = suggestion.label.toLowerCase();
+
+            // Check if we've already added this exact suggestion or a very similar one
+            if (!processedSuggestions.has(suggestionKey) && !existingSuggestions.has(suggestionLabel)) {
+              suggestions.push(suggestion);
+              processedSuggestions.add(suggestionKey);
+              existingSuggestions.add(suggestionLabel);
+              allWords.add(lowerWord);
+            }
           }
         }
       }
     });
-    
+
     // Process chunks with deduplication
     const processedChunks = new Set<string>();
-    
+
     // Add chunk suggestions from JSON content (only if they match input and are unique)
     existingChunks.forEach(chunk => {
       if (chunk && chunk.length > 0 && chunk.length < 100) { // Filter very long chunks
         const lowerChunk = chunk.toLowerCase();
         if (processedChunks.has(lowerChunk)) return;
         processedChunks.add(lowerChunk);
-        
+
         const chunkWords = chunk.split(' ').filter(word => word.length > 0);
         // Only suggest chunks if they contain multiple words or the entire chunk matches the input
         if (chunkWords.length > 1 && (!inputText || lowerChunk.includes(inputText.toLowerCase()))) {
           // Additional deduplication: ensure chunk doesn't already exist as individual words
           const chunkAlreadyExists = chunkWords.every(word => allWords.has(word.toLowerCase()));
-          
+
           if (!chunkAlreadyExists) {
             const suggestion = shouldAddQuotes
               ? {
-                  label: `"${chunk}"`,
-                  kind: monaco.languages.CompletionItemKind.Value,
-                  insertText: `"${chunk}"`,
-                  documentation: `Use quoted chunk: "${chunk}"`,
-                  sortText: `1${chunk}` // Sort after single words
-                }
+                label: `"${chunk}"`,
+                kind: monaco.languages.CompletionItemKind.Value,
+                insertText: `"${chunk}"`,
+                documentation: `Use quoted chunk: "${chunk}"`,
+                sortText: `1${chunk}` // Sort after single words
+              }
               : {
-                  label: chunk,
-                  kind: monaco.languages.CompletionItemKind.Variable,
-                  insertText: chunk,
-                  documentation: `Use word chunk: "${chunk}"`,
-                  sortText: `1${chunk}` // Sort after single words
-                };
+                label: chunk,
+                kind: monaco.languages.CompletionItemKind.Variable,
+                insertText: chunk,
+                documentation: `Use word chunk: "${chunk}"`,
+                sortText: `1${chunk}` // Sort after single words
+              };
 
             const suggestionKey = suggestion.insertText.toLowerCase();
             const suggestionLabel = suggestion.label.toLowerCase();
-            
+
             // Check if we've already added this exact suggestion or a very similar one
             if (!processedSuggestions.has(suggestionKey) && !existingSuggestions.has(suggestionLabel)) {
               suggestions.push(suggestion);
@@ -240,7 +241,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         }
       }
     });
-    
+
     return suggestions;
   };
 
@@ -249,42 +250,42 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     const line = model.getLineContent(position.lineNumber);
     const beforeCursor = line.substring(0, position.column - 1);
     const currentLineUntilCursor = line.substring(0, position.column);
-    
+
     // Track the JSON path and determine if we're in a value position
     const path: string[] = [];
     let isValue = false;
-    
+
     // Function to extract the current object path
     const getCurrentPath = () => {
       let depth = 0;
       let currentKey = '';
       let inString = false;
       let escapeNext = false;
-      
+
       // Look through previous lines to handle multi-line objects
       for (let lineNum = position.lineNumber; lineNum >= 1; lineNum--) {
-        const currentLine = lineNum === position.lineNumber 
-          ? currentLineUntilCursor 
+        const currentLine = lineNum === position.lineNumber
+          ? currentLineUntilCursor
           : model.getLineContent(lineNum);
-        
+
         for (let i = currentLine.length - 1; i >= 0; i--) {
           const char = currentLine[i];
-          
+
           if (escapeNext) {
             escapeNext = false;
             continue;
           }
-          
+
           if (char === '\\') {
             escapeNext = true;
             continue;
           }
-          
+
           if (char === '"' && !escapeNext) {
             inString = !inString;
             continue;
           }
-          
+
           if (!inString) {
             if (char === '}' || char === ']') {
               depth++;
@@ -311,21 +312,21 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         }
       }
     };
-    
+
     getCurrentPath();
-    
+
     // Extract the text we're currently typing
     let currentText = '';
     const wordMatch = beforeCursor.match(/[a-zA-Z0-9_.-]*$/);
     if (wordMatch) {
       currentText = wordMatch[0];
     }
-    
+
     // Check if we're inside quotes by counting quote marks before cursor
     let insideQuotes = false;
     let quoteCount = 0;
     let isEscaped = false;
-    
+
     for (let i = 0; i < beforeCursor.length; i++) {
       const char = beforeCursor[i];
       if (char === '\\') {
@@ -357,7 +358,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
         if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
           const isDark = document.documentElement.classList.contains('dark');
           const newTheme = isDark ? 'vs-dark' : 'vs';
-          
+
           if (monacoInstance) {
             monacoInstance.editor.setTheme(newTheme);
           }
@@ -382,10 +383,19 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     }
   }, [theme, monacoInstance]);
 
+  // Cleanup resize listener on unmount
+  useEffect(() => {
+    return () => {
+      if (resizeListenerRef.current) {
+        resizeListenerRef.current();
+      }
+    };
+  }, []);
+
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     internalEditorRef.current = editor;
     setMonacoInstance(monaco);
-    
+
     // Call the onMount prop if provided
     if (onMount) {
       onMount(editor);
@@ -396,6 +406,19 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     if (editorDomNode) {
       (editorDomNode as any).__isMonacoEditor = true;
     }
+
+    // Add window resize listener to update font size dynamically
+    const handleResize = () => {
+      const newFontSize = Math.max(13, Math.min(28, 13 + (window.innerWidth - 1280) * 0.006));
+      editor.updateOptions({ fontSize: newFontSize });
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Store cleanup function
+    resizeListenerRef.current = () => {
+      window.removeEventListener('resize', handleResize);
+    };
 
     // Enable JSON validation with custom settings
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -414,12 +437,12 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     if (model) {
       // Set the language to JSON
       monaco.editor.setModelLanguage(model, 'json');
-      
+
       // Add custom validation for JSON syntax errors
       const validate = () => {
         const content = model.getValue();
         const markers: monaco.editor.IMarkerData[] = [];
-        
+
         try {
           // First, try to parse the JSON
           JSON.parse(content);
@@ -436,11 +459,11 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
               const lineNumber = position.lineNumber;
               let column = position.column;
               const lineContent = model.getLineContent(lineNumber);
-              
+
               // Check if the error is likely a missing comma
-              const isMissingComma = e.message.includes('Unexpected token') || 
-                                   e.message.includes('Expected');
-              
+              const isMissingComma = e.message.includes('Unexpected token') ||
+                e.message.includes('Expected');
+
               if (isMissingComma) {
                 // For missing commas, we want to highlight the end of the previous line
                 if (column <= 1 && lineNumber > 1) {
@@ -449,11 +472,11 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
                   while (prevLineNum > 0 && model.getLineContent(prevLineNum).trim() === '') {
                     prevLineNum--;
                   }
-                  
+
                   if (prevLineNum > 0) {
                     const prevLine = model.getLineContent(prevLineNum);
                     const trimmedLine = prevLine.trim();
-                    
+
                     // Only add marker if the previous line ends with a value (not a closing bracket/brace)
                     if (trimmedLine.length > 0 && !/[\]}{]\s*$/.test(trimmedLine)) {
                       // Find the last non-whitespace character
@@ -461,7 +484,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
                       while (lastCharPos > 0 && /\s/.test(prevLine[lastCharPos - 1])) {
                         lastCharPos--;
                       }
-                      
+
                       if (lastCharPos > 0) {
                         markers.push({
                           severity: monaco.MarkerSeverity.Error,
@@ -478,21 +501,21 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
                   // For errors in the middle of the line, try to find the token boundaries
                   const lineStart = model.getOffsetAt({ lineNumber, column: 1 });
                   const relativePos = errorPosition - lineStart;
-                  
+
                   // Look for the start of the token
                   let startColumn = Math.max(1, column);
                   for (let i = relativePos - 1; i >= 0; i--) {
                     if (/[\s\n\r,{}\[\]]/.test(lineContent[i])) break;
                     startColumn = i + 1;
                   }
-                  
+
                   // Look for the end of the token
                   let endColumn = Math.min(lineContent.length + 1, column + 1);
                   for (let i = relativePos; i < lineContent.length; i++) {
                     if (/[\s\n\r,{}\[\]]/.test(lineContent[i])) break;
                     endColumn = i + 2;
                   }
-                  
+
                   markers.push({
                     severity: monaco.MarkerSeverity.Error,
                     message: e.message,
@@ -516,7 +539,7 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
             }
           }
         }
-        
+
         // Set the markers
         monaco.editor.setModelMarkers(model, 'json', markers);
       };
@@ -548,116 +571,116 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     // Only register the completion provider once
     if (!isCompletionProviderRegistered) {
       isCompletionProviderRegistered = true;
-      
+
       // Register enhanced completion provider with nested JSON awareness
       monaco.languages.registerCompletionItemProvider('json', {
-      provideCompletionItems: (model, position) => {
-        try {
-          const fullContent = model.getValue();
-          
-          // Get enhanced context including path and value position
-          const context = detectStringContext(model, position);
-          
-          // Filter out any suggestions that might lead to $schema
-          const currentLine = model.getLineContent(position.lineNumber);
-          const linePrefix = currentLine.substring(0, position.column);
-          if (linePrefix.includes('$') || linePrefix.includes('schema') || context.text.includes('$') || context.text.toLowerCase().includes('schema')) {
+        provideCompletionItems: (model, position) => {
+          try {
+            const fullContent = model.getValue();
+
+            // Get enhanced context including path and value position
+            const context = detectStringContext(model, position);
+
+            // Filter out any suggestions that might lead to $schema
+            const currentLine = model.getLineContent(position.lineNumber);
+            const linePrefix = currentLine.substring(0, position.column);
+            if (linePrefix.includes('$') || linePrefix.includes('schema') || context.text.includes('$') || context.text.toLowerCase().includes('schema')) {
+              return { suggestions: [] };
+            }
+
+            // Extract existing words and chunks from JSON content
+            const existingWords = extractExistingWords(fullContent);
+            const existingChunks = extractWordChunks(fullContent);
+
+            // Analyze the JSON structure to get relevant suggestions
+            let relevantSuggestions: any[] = [];
+
+            try {
+              const jsonContent = JSON.parse(fullContent);
+
+              // If we're in a nested object, look for similar properties at the same nesting level
+              if (context.path.length > 0) {
+                const getSimilarProperties = (obj: any, path: string[], depth: number = 0): string[] => {
+                  if (!obj || typeof obj !== 'object') return [];
+
+                  if (depth === path.length - 1) {
+                    // We're at the target nesting level, collect sibling properties
+                    return Object.keys(obj);
+                  }
+
+                  const currentKey = path[depth];
+                  if (obj[currentKey]) {
+                    return getSimilarProperties(obj[currentKey], path, depth + 1);
+                  }
+
+                  return [];
+                };
+
+                // Get properties from similar nesting levels
+                const similarProps = getSimilarProperties(jsonContent, context.path);
+                relevantSuggestions.push(
+                  ...similarProps.map(prop => ({
+                    label: `"${prop}"`,
+                    kind: monaco.languages.CompletionItemKind.Property,
+                    insertText: `"${prop}"`,
+                    detail: 'Similar property from current context',
+                    sortText: '0' + prop // Sort these suggestions first
+                  }))
+                );
+              }
+            } catch (e) {
+              // JSON parsing failed, fall back to word-based suggestions
+            }
+
+            // Get word-based suggestions as fallback
+            const wordSuggestions = getWordBasedSuggestions(context, existingWords, existingChunks);
+            relevantSuggestions.push(...wordSuggestions);
+
+            // Calculate word boundary for proper range
+            const line = model.getLineContent(position.lineNumber);
+            let wordStart = position.column - 1;
+            while (wordStart > 0 && /[a-zA-Z0-9_.-]/.test(line[wordStart - 1])) {
+              wordStart--;
+            }
+
+            const wordRange = {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: wordStart + 1,
+              endColumn: position.column
+            };
+
+            // Filter out any suggestions containing $schema and deduplicate by insertText/label
+            const seen = new Set<string>();
+            const uniqueSuggestions: any[] = [];
+
+            for (const suggestion of relevantSuggestions) {
+              const textRaw = (suggestion.insertText || suggestion.label || '').toString();
+              const text = textRaw.toLowerCase();
+
+              if (!text || text.includes('$schema')) continue;
+
+              // Use the raw text as the uniqueness key (preserves quotes if present)
+              const key = textRaw;
+              if (seen.has(key)) continue;
+
+              seen.add(key);
+              uniqueSuggestions.push({ ...suggestion, range: wordRange });
+            }
+
+            return { suggestions: uniqueSuggestions };
+          } catch (error) {
+            console.error('Completion provider error:', error);
             return { suggestions: [] };
           }
-          
-          // Extract existing words and chunks from JSON content
-          const existingWords = extractExistingWords(fullContent);
-          const existingChunks = extractWordChunks(fullContent);
-          
-          // Analyze the JSON structure to get relevant suggestions
-          let relevantSuggestions: any[] = [];
-          
-          try {
-            const jsonContent = JSON.parse(fullContent);
-            
-            // If we're in a nested object, look for similar properties at the same nesting level
-            if (context.path.length > 0) {
-              const getSimilarProperties = (obj: any, path: string[], depth: number = 0): string[] => {
-                if (!obj || typeof obj !== 'object') return [];
-                
-                if (depth === path.length - 1) {
-                  // We're at the target nesting level, collect sibling properties
-                  return Object.keys(obj);
-                }
-                
-                const currentKey = path[depth];
-                if (obj[currentKey]) {
-                  return getSimilarProperties(obj[currentKey], path, depth + 1);
-                }
-                
-                return [];
-              };
-              
-              // Get properties from similar nesting levels
-              const similarProps = getSimilarProperties(jsonContent, context.path);
-              relevantSuggestions.push(
-                ...similarProps.map(prop => ({
-                  label: `"${prop}"`,
-                  kind: monaco.languages.CompletionItemKind.Property,
-                  insertText: `"${prop}"`,
-                  detail: 'Similar property from current context',
-                  sortText: '0' + prop // Sort these suggestions first
-                }))
-              );
-            }
-          } catch (e) {
-            // JSON parsing failed, fall back to word-based suggestions
-          }
-          
-          // Get word-based suggestions as fallback
-          const wordSuggestions = getWordBasedSuggestions(context, existingWords, existingChunks);
-          relevantSuggestions.push(...wordSuggestions);
-          
-          // Calculate word boundary for proper range
-          const line = model.getLineContent(position.lineNumber);
-          let wordStart = position.column - 1;
-          while (wordStart > 0 && /[a-zA-Z0-9_.-]/.test(line[wordStart - 1])) {
-            wordStart--;
-          }
-          
-          const wordRange = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: wordStart + 1,
-            endColumn: position.column
-          };
-          
-          // Filter out any suggestions containing $schema and deduplicate by insertText/label
-          const seen = new Set<string>();
-          const uniqueSuggestions: any[] = [];
-
-          for (const suggestion of relevantSuggestions) {
-            const textRaw = (suggestion.insertText || suggestion.label || '').toString();
-            const text = textRaw.toLowerCase();
-
-            if (!text || text.includes('$schema')) continue;
-
-            // Use the raw text as the uniqueness key (preserves quotes if present)
-            const key = textRaw;
-            if (seen.has(key)) continue;
-
-            seen.add(key);
-            uniqueSuggestions.push({ ...suggestion, range: wordRange });
-          }
-
-          return { suggestions: uniqueSuggestions };
-        } catch (error) {
-          console.error('Completion provider error:', error);
-          return { suggestions: [] };
-        }
-      },
-      // Trigger on letters, underscore, and symbols (excluding punctuation like comma, full stop)
-      triggerCharacters: [
-        // Letters (excluding 's' to prevent $schema triggers)
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-        // Underscore
-        '_'
+        },
+        // Trigger on letters, underscore, and symbols (excluding punctuation like comma, full stop)
+        triggerCharacters: [
+          // Letters (excluding 's' to prevent $schema triggers)
+          'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+          'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+          // Underscore
+          '_'
         ]
       });
     }
@@ -676,9 +699,10 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       editor.getAction('editor.action.copyLinesDownAction')?.run();
     });
 
-    // Configure editor options
+    // Configure editor options with responsive font size (fluid scaling)
+    const responsiveFontSize = Math.max(13, Math.min(28, 13 + (window.innerWidth - 1280) * 0.006));
     editor.updateOptions({
-      fontSize: 14,
+      fontSize: responsiveFontSize,
       lineHeight: 1.6,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', Monaco, Consolas, 'Courier New', monospace",
       fontLigatures: true,
@@ -717,12 +741,16 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
     });
   };
 
+  const responsiveFontSize = typeof window !== 'undefined'
+    ? Math.max(13, Math.min(28, 13 + (window.innerWidth - 1280) * 0.006))
+    : 13;
+
   const defaultOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     language: 'json',
     theme: document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs',
     automaticLayout: true,
     scrollBeyondLastLine: false,
-    fontSize: 14,
+    fontSize: responsiveFontSize,
     lineHeight: 1.6,
     minimap: { enabled: true },
     showFoldingControls: 'always',
@@ -747,9 +775,9 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-background">
+    <div className="border rounded-lg overflow-hidden bg-background" style={{ height }}>
       <Editor
-        height={height}
+        height="100%"
         defaultLanguage="json"
         value={value}
         onChange={onChange}
