@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import type { editor } from 'monaco-editor';
+import { get, set, del } from 'idb-keyval';
 import {
   Settings as SettingsIcon,
   X,
@@ -73,103 +74,105 @@ interface Toast {
 }
 
 export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) {
-  // For diff mode - Load saved inputs from localStorage on mount
-  const [leftInput, setLeftInput] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('json-viewer-diff-left');
-      return saved || '';
-    }
-    return '';
+  // State initialization with defaults
+  const [leftInput, setLeftInput] = useState('');
+  const [rightInput, setRightInput] = useState('');
+  const [input, setInput] = useState('');
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>({
+    tabSize: 2,
+    fontSize: 'auto',
+    lineHeight: 1.6,
   });
-  const [rightInput, setRightInput] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('json-viewer-diff-right');
-      return saved || '';
-    }
-    return '';
-  });
+
+  // Loading state for storage restoration
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
-  const leftEditorRef = useRef<any>(null);
-  const rightEditorRef = useRef<any>(null);
-  const diffEditorRef = useRef<any>(null);
   const [currentDiffIndex, setCurrentDiffIndex] = useState<number>(-1);
   const [totalDiffs, setTotalDiffs] = useState<number>(0);
-  // Load saved input from localStorage on mount
-  const [input, setInput] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('json-viewer-input');
-      return saved || '';
-    }
-    return '';
-  });
-  const [error, setError] = useState<{ message: string; line?: number; column?: number; position?: number } | null>(null);
+
   const [isDragOver, setIsDragOver] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<JSONNode[]>([]);
   const [activeSearchResult, setActiveSearchResult] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [editorInstance, setEditorInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [viewMode, setViewMode] = useState<'formatted' | 'diff'>('formatted');
   const [isFormatting, setIsFormatting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const leftEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const rightEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
 
   // Download modal state
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
-  // Settings modal state and editor settings
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('json-viewer-settings');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          // Fall through to default
+  // Load saved data from IndexedDB on mount
+  useEffect(() => {
+    const loadSavedData = async () => {
+      try {
+        const [savedInput, savedLeft, savedRight, savedSettings] = await Promise.all([
+          get('json-viewer-input'),
+          get('json-viewer-diff-left'),
+          get('json-viewer-diff-right'),
+          get('json-viewer-settings')
+        ]);
+
+        if (savedInput) setInput(savedInput);
+        if (savedLeft) setLeftInput(savedLeft);
+        if (savedRight) setRightInput(savedRight);
+        if (savedSettings) {
+          try {
+            // Handle legacy localStorage format if needed, though get() returns parsed object usually
+            const parsed = typeof savedSettings === 'string' ? JSON.parse(savedSettings) : savedSettings;
+            setEditorSettings(parsed);
+          } catch (e) {
+            // Fallback to default if parsing fails
+          }
         }
+      } catch (error) {
+        console.error('Failed to load saved data:', error);
+      } finally {
+        setIsRestoring(false);
       }
-    }
-    return {
-      tabSize: 2,
-      fontSize: 'auto',
-      lineHeight: 1.6,
     };
-  });
 
-  // Passive validation - only for status indicators, doesn't interrupt editing
-  const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
+    loadSavedData();
+  }, []);
 
-  // Save input to localStorage when it changes (only in normal mode)
+  // Save input to IndexedDB when it changes
   useEffect(() => {
-    if (viewMode === 'formatted' && typeof window !== 'undefined') {
-      localStorage.setItem('json-viewer-input', input);
+    if (!isRestoring) {
+      set('json-viewer-input', input).catch(err => console.error('Failed to save input:', err));
     }
-  }, [input, viewMode]);
+  }, [input, isRestoring]);
 
-  // Save diff mode inputs to localStorage when they change
+  // Save diff mode inputs to IndexedDB when they change
   useEffect(() => {
-    if (viewMode === 'diff' && typeof window !== 'undefined') {
-      localStorage.setItem('json-viewer-diff-left', leftInput);
+    if (!isRestoring && viewMode === 'diff') {
+      set('json-viewer-diff-left', leftInput).catch(err => console.error('Failed to save left input:', err));
     }
-  }, [leftInput, viewMode]);
+  }, [leftInput, viewMode, isRestoring]);
 
   useEffect(() => {
-    if (viewMode === 'diff' && typeof window !== 'undefined') {
-      localStorage.setItem('json-viewer-diff-right', rightInput);
+    if (!isRestoring && viewMode === 'diff') {
+      set('json-viewer-diff-right', rightInput).catch(err => console.error('Failed to save right input:', err));
     }
-  }, [rightInput, viewMode]);
+  }, [rightInput, viewMode, isRestoring]);
 
-  // Save settings to localStorage when they change
+  // Save settings to IndexedDB when they change
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('json-viewer-settings', JSON.stringify(editorSettings));
+    if (!isRestoring) {
+      set('json-viewer-settings', editorSettings).catch(err => console.error('Failed to save settings:', err));
     }
-  }, [editorSettings]);
+  }, [editorSettings, isRestoring]);
 
   // Update editor options when settings change
   useEffect(() => {
@@ -495,7 +498,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       setSearchTerm('');
       setSearchResults([]);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('json-viewer-input');
+        del('json-viewer-input').catch(err => console.error('Failed to clear input:', err));
       }
       addToast('JSON cleared', 'info');
     }

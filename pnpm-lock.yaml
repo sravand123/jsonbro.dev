@@ -113,6 +113,9 @@ importers:
       hotkeys-js:
         specifier: 4.0.0-beta.6
         version: 4.0.0-beta.6
+      idb-keyval:
+        specifier: ^6.2.2
+        version: 6.2.2
       input-otp:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -2086,6 +2089,9 @@ packages:
 
   hotkeys-js@4.0.0-beta.6:
     resolution: {integrity: sha512-oR2ReRJcLnm4L4itKrSUMQSdec0P0KTPtIuP13JsYmkx4ls1a6iIFUi2WfzAE6wBmme1ptdJJ7qGxpwlO5emdA==}
+
+  idb-keyval@6.2.2:
+    resolution: {integrity: sha512-yjD9nARJ/jb1g+CvD0tlhUHOrJ9Sy0P8T9MF3YaLlHnSRpwPfpTX0XIvpmw3gAJUmEu3FiICLBDPXVwyEvrleg==}
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
@@ -4756,6 +4762,8 @@ snapshots:
       function-bind: 1.1.2
 
   hotkeys-js@4.0.0-beta.6: {}
+
+  idb-keyval@6.2.2: {}
 
   ignore@5.3.2: {}
 
