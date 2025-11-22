@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { GitHubStars } from './GitHubStars';
 import { DownloadModal } from './DownloadModal';
+import { SettingsModal, type EditorSettings } from './SettingsModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -117,6 +118,26 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   // Download modal state
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
+  // Settings modal state and editor settings
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('json-viewer-settings');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          // Fall through to default
+        }
+      }
+    }
+    return {
+      tabSize: 2,
+      fontSize: 'auto',
+      lineHeight: 1.6,
+    };
+  });
+
   // Passive validation - only for status indicators, doesn't interrupt editing
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
 
@@ -139,6 +160,30 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       localStorage.setItem('json-viewer-diff-right', rightInput);
     }
   }, [rightInput, viewMode]);
+
+  // Save settings to localStorage when they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('json-viewer-settings', JSON.stringify(editorSettings));
+    }
+  }, [editorSettings]);
+
+  // Update editor options when settings change
+  useEffect(() => {
+    if (editorRef.current) {
+      const actualFontSize = editorSettings.fontSize === 'auto'
+        ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+        : editorSettings.fontSize;
+
+      editorRef.current.updateOptions({
+        tabSize: editorSettings.tabSize,
+        insertSpaces: true,
+        fontSize: actualFontSize,
+        lineHeight: editorSettings.lineHeight,
+      });
+    }
+  }, [editorSettings]);
+
 
   useEffect(() => {
     // Only update passive validation status, don't set error states
@@ -424,7 +469,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         return;
       }
 
-      const formatted = formatJSON(data);
+      const formatted = formatJSON(data, editorSettings.tabSize);
 
       // Preserve cursor position
       const editor = editorRef.current;
@@ -438,7 +483,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
           editor.setPosition(position);
           editor.focus();
         }
-      }, 50);
+      }, 0);
 
       addToast('JSON formatted successfully', 'success');
     } catch (err) {
@@ -446,7 +491,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     } finally {
       setIsFormatting(false);
     }
-  }, [input, addToast]);
+  }, [input, addToast, editorSettings.tabSize]);
 
   const handleMinify = useCallback(() => {
     if (!input.trim()) {
@@ -800,6 +845,17 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
             <div className="w-px h-4 bg-border/50 mx-1" />
 
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => setIsSettingsModalOpen(true)} className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground">
+                  <Settings className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs font-medium">
+                <p>Settings</p>
+              </TooltipContent>
+            </Tooltip>
+
             <GitHubStars />
           </div>
         </header>
@@ -837,9 +893,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 options={{
                   minimap: { enabled: true },
                   padding: { top: 20, bottom: 20 },
-                  fontSize: Math.max(13, Math.min(28, 13 + (window.innerWidth - 1280) * 0.006)),
-                  lineHeight: 1.6,
+                  fontSize: editorSettings.fontSize === 'auto'
+                    ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                    : editorSettings.fontSize,
+                  lineHeight: editorSettings.lineHeight,
                   scrollBeyondLastLine: false,
+                  tabSize: editorSettings.tabSize,
+                  insertSpaces: true,
+                  wordWrap: 'on',
                 }}
                 onMount={handleEditorDidMount}
               />
@@ -1028,6 +1089,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         onClose={() => setIsDownloadModalOpen(false)}
         onDownload={handleDownloadWithFormat}
         defaultFilename={`formatted_${Date.now()}`}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        settings={editorSettings}
+        onSave={setEditorSettings}
       />
 
     </TooltipProvider >
