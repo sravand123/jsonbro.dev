@@ -722,7 +722,6 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       formatOnType: true,
       renderWhitespace: 'boundary',
       renderControlCharacters: false,
-      rulers: [80],
       showFoldingControls: 'always',
       bracketPairColorization: { enabled: true },
       guides: {

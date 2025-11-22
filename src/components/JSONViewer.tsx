@@ -66,9 +66,21 @@ interface Toast {
 }
 
 export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) {
-  // For diff mode
-  const [leftInput, setLeftInput] = useState('');
-  const [rightInput, setRightInput] = useState('');
+  // For diff mode - Load saved inputs from localStorage on mount
+  const [leftInput, setLeftInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('json-viewer-diff-left');
+      return saved || '';
+    }
+    return '';
+  });
+  const [rightInput, setRightInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('json-viewer-diff-right');
+      return saved || '';
+    }
+    return '';
+  });
   const [showDiff, setShowDiff] = useState(false);
   const leftEditorRef = useRef<any>(null);
   const rightEditorRef = useRef<any>(null);
@@ -108,6 +120,19 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       localStorage.setItem('json-viewer-input', input);
     }
   }, [input, viewMode]);
+
+  // Save diff mode inputs to localStorage when they change
+  useEffect(() => {
+    if (viewMode === 'diff' && typeof window !== 'undefined') {
+      localStorage.setItem('json-viewer-diff-left', leftInput);
+    }
+  }, [leftInput, viewMode]);
+
+  useEffect(() => {
+    if (viewMode === 'diff' && typeof window !== 'undefined') {
+      localStorage.setItem('json-viewer-diff-right', rightInput);
+    }
+  }, [rightInput, viewMode]);
 
   useEffect(() => {
     // Only update passive validation status, don't set error states
@@ -794,14 +819,24 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               <div className="flex items-center justify-between px-6 py-2 border-b bg-muted/30 h-12 shrink-0 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center space-x-3 bg-muted/50 p-1 rounded-lg border border-border/50">
-                    <span className={`text-xs font-medium px-2 transition-colors ${!showDiff ? 'text-foreground' : 'text-muted-foreground'}`}>Split View</span>
+                    <span
+                      onClick={() => !(!leftInput.trim() || !rightInput.trim()) && setShowDiff(false)}
+                      className={`text-xs font-medium px-2 transition-colors cursor-pointer hover:opacity-70 ${!showDiff ? 'text-foreground' : 'text-muted-foreground'} ${(!leftInput.trim() || !rightInput.trim()) ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      Edit
+                    </span>
                     <Switch
                       checked={showDiff}
                       onCheckedChange={setShowDiff}
                       disabled={!leftInput.trim() || !rightInput.trim()}
-                      className="data-[state=checked]:bg-primary"
+                      className="data-[state=checked]:bg-primary !h-4 !w-8 [&>span]:!h-3 [&>span]:!w-3 [&>span]:data-[state=checked]:!translate-x-4"
                     />
-                    <span className={`text-xs font-medium px-2 transition-colors ${showDiff ? 'text-foreground' : 'text-muted-foreground'}`}>Diff Result</span>
+                    <span
+                      onClick={() => !(!leftInput.trim() || !rightInput.trim()) && setShowDiff(true)}
+                      className={`text-xs font-medium px-2 transition-colors cursor-pointer hover:opacity-70 ${showDiff ? 'text-foreground' : 'text-muted-foreground'} ${(!leftInput.trim() || !rightInput.trim()) ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      Diff Result
+                    </span>
                   </div>
                 </div>
 
