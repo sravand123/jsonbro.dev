@@ -118,7 +118,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                                         setLocalSettings({ ...localSettings, tabSize: 10 });
                                     }
                                 }}
-                                className="w-full h-8 text-sm"
+                                className="w-full h-8 text-sm [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                             <p className="text-xs text-muted-foreground">Number of spaces per indentation (max 10)</p>
                         </div>
@@ -185,7 +185,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                                             setLocalSettings({ ...localSettings, fontSize: 28 });
                                         }
                                     }}
-                                    className="w-full h-8 text-sm"
+                                    className="w-full h-8 text-sm [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                             )}
                             <p className="text-xs text-muted-foreground">
@@ -224,7 +224,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                                         setLocalSettings({ ...localSettings, lineHeight: 3 });
                                     }
                                 }}
-                                className="w-full h-8 text-sm"
+                                className="w-full h-8 text-sm [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                             <p className="text-xs text-muted-foreground">Spacing between lines (1.0 - 3.0)</p>
                         </div>
