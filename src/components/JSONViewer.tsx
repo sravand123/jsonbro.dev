@@ -44,6 +44,7 @@ import {
   copyToClipboard,
   downloadJSON,
   parseJSONFile,
+  parseCSVFile,
   searchJSON,
   KEYBOARD_SHORTCUTS,
   isShortcut,
@@ -544,22 +545,37 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   }, [input, addToast]);
 
   const handleFileUpload = useCallback(async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.json')) {
-      addToast('Please select a JSON file', 'error');
+    const fileName = file.name.toLowerCase();
+    const isJSON = fileName.endsWith('.json');
+    const isCSV = fileName.endsWith('.csv');
+
+    if (!isJSON && !isCSV) {
+      addToast('Please select a JSON or CSV file', 'error');
       return;
     }
 
     setIsLoading(true);
     try {
-      const { data, error: parseError } = await parseJSONFile(file);
+      let data;
+      let parseError;
+
+      if (isCSV) {
+        const result = await parseCSVFile(file);
+        data = result.data;
+        parseError = result.error;
+      } else {
+        const result = await parseJSONFile(file);
+        data = result.data;
+        parseError = result.error;
+      }
 
       if (parseError) {
-        addToast('Invalid JSON file: ' + parseError.message, 'error');
+        addToast(`Invalid ${isCSV ? 'CSV' : 'JSON'} file: ` + parseError.message, 'error');
         return;
       }
 
       setInput(JSON.stringify(data, null, 2));
-      addToast(`Loaded ${file.name}`, 'success');
+      addToast(`Loaded ${file.name}${isCSV ? ' and converted to JSON' : ''}`, 'success');
     } catch (err) {
       addToast('Failed to load file', 'error');
     } finally {
@@ -811,7 +827,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json"
+                accept=".json,.csv"
                 onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
                 className="hidden"
               />

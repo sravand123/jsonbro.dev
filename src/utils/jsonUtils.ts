@@ -1,3 +1,5 @@
+import Papa from 'papaparse';
+
 export interface JSONError {
   message: string;
   line?: number;
@@ -342,6 +344,67 @@ export async function parseJSONFile(file: File): Promise<{ data: any; error: JSO
     reader.readAsText(file);
   });
 }
+
+/**
+ * Parse CSV file and convert to JSON
+ */
+export async function parseCSVFile(file: File): Promise<{ data: any; error: JSONError | null }> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) {
+        resolve({
+          data: null,
+          error: { message: 'File appears to be empty' }
+        });
+        return;
+      }
+
+      try {
+        const data = parseCSV(content);
+        resolve({ data, error: null });
+      } catch (error) {
+        resolve({
+          data: null,
+          error: { message: 'Failed to parse CSV: ' + (error as Error).message }
+        });
+      }
+    };
+
+    reader.onerror = () => {
+      resolve({
+        data: null,
+        error: { message: 'Failed to read file' }
+      });
+    };
+
+    reader.readAsText(file);
+  });
+}
+
+/**
+ * Parse CSV string to JSON array using PapaParse
+ */
+function parseCSV(csvString: string): any[] {
+  const result = Papa.parse(csvString, {
+    header: true, // Use first row as headers
+    dynamicTyping: true, // Automatically convert numbers and booleans
+    skipEmptyLines: true, // Skip empty lines
+    transformHeader: (header: string) => header.trim(), // Trim header whitespace
+    transform: (value: string) => value.trim() // Trim cell values
+  });
+
+  if (result.errors.length > 0) {
+    const error = result.errors[0];
+    throw new Error(`CSV parsing error at row ${error.row}: ${error.message}`);
+  }
+
+  return result.data;
+}
+
+
 
 /**
  * Get keyboard shortcuts
