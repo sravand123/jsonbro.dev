@@ -43,6 +43,7 @@ import hotkeys from 'hotkeys-js';
 import { GitHubStars } from './GitHubStars';
 import { DownloadModal } from './DownloadModal';
 import { SettingsModal, type EditorSettings } from './SettingsModal';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -952,6 +953,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 }}
                 onMount={handleEditorDidMount}
                 onPathChange={setCurrentPath}
+                onCopyPath={(path) => toast.success(`Path copied: ${path}`)}
               />
 
 

@@ -437,7 +437,7 @@ function parseCSV(csvString: string): any[] {
 }
 
 
-import { getLocation } from 'jsonc-parser';
+import { getLocation, findNodeAtOffset } from 'jsonc-parser';
 
 /**
  * Get the JSON path at a specific character offset
@@ -447,10 +447,12 @@ export function getJSONPathAtPosition(json: string, offset: number): string {
 
   try {
     const location = getLocation(json, offset);
-    const path = location.path;
+    let path = location.path;
+    if (path[path.length - 1] === '') {
+      path = path.slice(0, path.length - 1)
+    }
 
     if (!path || path.length === 0) return '';
-
     let result = '';
     for (let i = 0; i < path.length; i++) {
       const segment = path[i];

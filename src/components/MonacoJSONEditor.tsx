@@ -13,12 +13,13 @@ interface MonacoJSONEditorProps {
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
   onMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void;
   onPathChange?: (path: string) => void;
+  onCopyPath?: (path: string) => void;
 }
 
 import { getJSONPathAtPosition } from '../utils/jsonUtils';
 
 export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor | null, MonacoJSONEditorProps>((
-  { value, onChange, theme, height = '400px', options = {}, onMount, onPathChange }, ref
+  { value, onChange, theme, height = '400px', options = {}, onMount, onPathChange, onCopyPath }, ref
 ) => {
   const internalEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<typeof monaco | null>(null);
@@ -786,6 +787,33 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       acceptSuggestionOnCommitCharacter: true,
       acceptSuggestionOnEnter: 'on',
       tabCompletion: 'on'
+    });
+
+    // Add "Copy JSON Path" context menu action
+    editor.addAction({
+      id: 'json-copy-path',
+      label: 'Copy JSON Path',
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 1.5,
+      run: (ed) => {
+        const position = ed.getPosition();
+        const model = ed.getModel();
+        if (position && model) {
+          const offset = model.getOffsetAt(position);
+          const value = model.getValue();
+          const path = getJSONPathAtPosition(value, offset);
+
+          if (path) {
+            navigator.clipboard.writeText(path).then(() => {
+              if (onCopyPath) {
+                onCopyPath(path);
+              }
+            }).catch(err => {
+              console.error('Failed to copy path:', err);
+            });
+          }
+        }
+      }
     });
   };
 
