@@ -699,6 +699,37 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       editor.getAction('editor.action.copyLinesDownAction')?.run();
     });
 
+    // Add custom paste handler to format JSON on paste
+    editor.onDidPaste((e) => {
+      const model = editor.getModel();
+      if (!model) return;
+
+      // Get the pasted content
+      const content = model.getValue();
+
+      try {
+        // Try to parse and format the JSON
+        const parsed = JSON.parse(content);
+        const formatted = JSON.stringify(parsed, null, 2);
+
+        // Only update if the content changed (was actually formatted)
+        if (formatted !== content) {
+          const currentPosition = editor.getPosition();
+
+          // Update the editor content
+          model.setValue(formatted);
+
+          // Try to restore cursor position
+          if (currentPosition) {
+            editor.setPosition(currentPosition);
+          }
+        }
+      } catch (err) {
+        // If parsing fails, leave the content as-is
+        // This allows users to paste partial JSON or work with invalid JSON
+      }
+    });
+
     // Configure editor options with responsive font size (fluid scaling)
     const responsiveFontSize = Math.max(13, Math.min(28, 13 + (window.innerWidth - 1280) * 0.006));
     editor.updateOptions({
