@@ -730,6 +730,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 <p>Toggle Theme</p>
               </TooltipContent>
             </Tooltip>
+
+            <div className="w-px h-4 bg-border/50 mx-1" />
+
+            <GitHubStars />
           </div>
         </header>
 
