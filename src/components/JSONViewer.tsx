@@ -34,7 +34,7 @@ import {
   Columns
 } from 'lucide-react';
 import { GitHubStars } from './GitHubStars';
-import { DownloadDropdown } from './DownloadDropdown';
+import { DownloadModal } from './DownloadModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -113,6 +113,9 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  // Download modal state
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // Passive validation - only for status indicators, doesn't interrupt editing
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | 'empty'>('empty');
@@ -538,36 +541,29 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       return;
     }
 
-    const filename = data && typeof data === 'object' && Object.keys(data).length > 0
-      ? `formatted_${Date.now()}.json`
-      : 'formatted.json';
-
-    downloadJSON(input, filename);
-    addToast('JSON downloaded', 'success');
+    // Open the modal instead of downloading directly
+    setIsDownloadModalOpen(true);
   }, [input, addToast]);
 
-  const handleDownloadCSV = useCallback(() => {
-    if (!input.trim()) {
-      addToast('No JSON to download', 'error');
-      return;
-    }
-
-    // Validate before downloading - only show error if invalid
+  const handleDownloadWithFormat = useCallback((filename: string, format: 'json' | 'csv') => {
     const { data, error: parseError } = parseJSONSafe(input);
     if (parseError) {
       addToast('Invalid JSON - Cannot download invalid syntax', 'error');
       return;
     }
 
-    try {
-      const filename = data && typeof data === 'object' && Object.keys(data).length > 0
-        ? `formatted_${Date.now()}.csv`
-        : 'formatted.csv';
+    const fullFilename = `${filename}.${format}`;
 
-      downloadCSV(input, filename);
-      addToast('CSV downloaded', 'success');
-    } catch (err) {
-      addToast('Failed to convert to CSV - Data must be an array or object', 'error');
+    if (format === 'csv') {
+      try {
+        downloadCSV(input, fullFilename);
+        addToast('CSV downloaded', 'success');
+      } catch (err) {
+        addToast('Failed to convert to CSV - Data must be an array or object', 'error');
+      }
+    } else {
+      downloadJSON(input, fullFilename);
+      addToast('JSON downloaded', 'success');
     }
   }, [input, addToast]);
 
@@ -769,13 +765,9 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <div>
-                  <DownloadDropdown
-                    onDownloadJSON={handleDownload}
-                    onDownloadCSV={handleDownloadCSV}
-                    className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground"
-                  />
-                </div>
+                <Button variant="ghost" size="icon" onClick={handleDownload} className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground">
+                  <Download className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7" />
+                </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
                 <p>Save <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.SAVE)})</span></p>
@@ -1029,6 +1021,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
           ))}
         </div>
       </div>
+
+      {/* Download Modal */}
+      <DownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        onDownload={handleDownloadWithFormat}
+        defaultFilename={`formatted_${Date.now()}`}
+      />
 
     </TooltipProvider >
   );
