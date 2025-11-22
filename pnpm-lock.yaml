@@ -110,6 +110,9 @@ importers:
       embla-carousel-react:
         specifier: ^8.5.2
         version: 8.6.0(react@18.3.1)
+      hotkeys-js:
+        specifier: 4.0.0-beta.6
+        version: 4.0.0-beta.6
       input-otp:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -2080,6 +2083,9 @@ packages:
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
+
+  hotkeys-js@4.0.0-beta.6:
+    resolution: {integrity: sha512-oR2ReRJcLnm4L4itKrSUMQSdec0P0KTPtIuP13JsYmkx4ls1a6iIFUi2WfzAE6wBmme1ptdJJ7qGxpwlO5emdA==}
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
@@ -4748,6 +4754,8 @@ snapshots:
   hasown@2.0.2:
     dependencies:
       function-bind: 1.1.2
+
+  hotkeys-js@4.0.0-beta.6: {}
 
   ignore@5.3.2: {}
 

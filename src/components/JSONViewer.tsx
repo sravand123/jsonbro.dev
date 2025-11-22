@@ -8,14 +8,21 @@ import {
 import { Switch } from "@/components/ui/switch"
 import type { editor } from 'monaco-editor';
 import {
+  Settings as SettingsIcon,
+  X,
+  FileJson,
+  FileSpreadsheet,
   Download,
   Upload,
   Copy,
   Trash2,
   Search,
+  Minimize2,
+  Maximize2,
+  FileText,
+  Check,
   Moon,
   Sun,
-  FileText,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -24,15 +31,14 @@ import {
   ArrowLeft,
   FileCode,
   FileCheck,
-  Minimize2,
-  Save,
-  Settings,
   Grid,
   Sparkles,
   Scaling,
   Split,
-  Columns
+  Columns,
+  Settings
 } from 'lucide-react';
+import hotkeys from 'hotkeys-js';
 import { GitHubStars } from './GitHubStars';
 import { DownloadModal } from './DownloadModal';
 import { SettingsModal, type EditorSettings } from './SettingsModal';
@@ -49,9 +55,6 @@ import {
   parseJSONFile,
   parseCSVFile,
   searchJSON,
-  KEYBOARD_SHORTCUTS,
-  isShortcut,
-  getShortcutText,
   type JSONNode
 } from '../utils/jsonUtils';
 import { MonacoJSONEditor } from './MonacoJSONEditor';
@@ -246,82 +249,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     setTotalDiffs(lineChanges.length);
   }, [currentDiffIndex]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Disable all shortcuts in diff mode
-      if (viewMode === 'diff') {
-        return;
-      }
-      // Get the active element
-      const activeElement = document.activeElement;
-      if (!activeElement) return;
 
-      // Check if we're in a Monaco editor by checking the parent chain
-      let isMonacoEditor = false;
-      let current: HTMLElement | null = activeElement as HTMLElement;
-      while (current) {
-        if ((current as any).__isMonacoEditor) {
-          isMonacoEditor = true;
-          break;
-        }
-        current = current.parentElement;
-      }
-
-      // If we're in Monaco editor, allow our custom shortcuts and block standard ones
-      if (isMonacoEditor) {
-        // Check if this matches one of our custom shortcuts
-        const matchedShortcut = Object.values(KEYBOARD_SHORTCUTS).find(shortcut =>
-          (event.ctrlKey || event.metaKey) &&
-          !event.altKey &&
-          event.shiftKey === ((shortcut as any).shift || false) &&
-          (shortcut.key === 'delete'
-            ? (event.key === 'Delete' || event.key === 'Backspace')
-            : event.key.toLowerCase() === shortcut.key.toLowerCase())
-        );
-
-        // If it's one of our shortcuts, allow it to proceed
-        if (matchedShortcut) {
-          // Continue to the shortcut handling below
-        } else {
-          // For standard shortcuts (copy, paste, etc.), let Monaco handle them
-          const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f'];
-          if (standardShortcuts.includes(event.key.toLowerCase()) &&
-            (event.ctrlKey || event.metaKey)) {
-            return; // Let Monaco handle these
-          }
-          // For other key combinations, don't handle them
-          return;
-        }
-      }
-
-      if (isShortcut(event, KEYBOARD_SHORTCUTS.FORMAT)) {
-        event.preventDefault();
-        handleFormat();
-      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.MINIFY)) {
-        event.preventDefault();
-        handleMinify();
-      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.COPY)) {
-        event.preventDefault();
-        handleCopy();
-      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.CLEAR)) {
-        event.preventDefault();
-        handleClear();
-      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.SEARCH)) {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.SAVE)) {
-        event.preventDefault();
-        handleDownload();
-      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.UPLOAD)) {
-        event.preventDefault();
-        fileInputRef.current?.click();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [input, viewMode]);
 
   // Handle editor mount
   const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
@@ -612,7 +540,17 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     }
   }, [input, addToast]);
 
-  const handleFileUpload = useCallback(async (file: File) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const processFile = useCallback(async (file: File) => {
     const fileName = file.name.toLowerCase();
     const isJSON = fileName.endsWith('.json');
     const isCSV = fileName.endsWith('.csv');
@@ -649,7 +587,16 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     } finally {
       setIsLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, setIsLoading]);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    processFile(file);
+    // Reset file input
+    e.target.value = '';
+  }, [processFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -657,19 +604,102 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      handleFileUpload(files[0]);
+      processFile(files[0]);
     }
-  }, [handleFileUpload]);
+  }, [processFile, setIsDragOver]);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
+  // Store handlers in a ref to access them in the hotkeys callback without re-binding
+  const handlersRef = useRef({
+    handleFormat,
+    handleMinify,
+    handleCopy,
+    handleClear,
+    handleDownload: () => setIsDownloadModalOpen(true),
+    handleUpload: () => fileInputRef.current?.click(),
+    handleSearch: () => searchInputRef.current?.focus()
+  });
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
+  // Update handlers ref when they change
+  useEffect(() => {
+    handlersRef.current = {
+      handleFormat,
+      handleMinify,
+      handleCopy,
+      handleClear,
+      handleDownload: () => setIsDownloadModalOpen(true),
+      handleUpload: () => fileInputRef.current?.click(),
+      handleSearch: () => searchInputRef.current?.focus()
+    };
+  }, [handleFormat, handleMinify, handleCopy, handleClear]);
+
+  // Setup keyboard shortcuts - bind only once
+  useEffect(() => {
+    // Configure hotkeys to work inside input/textarea/contenteditable
+    hotkeys.filter = function (event) {
+      const target = (event.target || event.srcElement) as HTMLElement;
+      // Always allow hotkeys, even in inputs
+      return true;
+    }
+
+    // Format: Cmd/Ctrl + Shift + F
+    hotkeys('command+shift+f, ctrl+shift+f', (event, handler) => {
+      event.preventDefault();
+      console.log('Format shortcut triggered');
+      handlersRef.current.handleFormat();
+    });
+
+    // Minify: Cmd/Ctrl + M
+    hotkeys('command+m, ctrl+m', (event, handler) => {
+      event.preventDefault();
+      console.log('Minify shortcut triggered');
+      handlersRef.current.handleMinify();
+    });
+
+    // Copy: Cmd/Ctrl + Shift + C
+    hotkeys('command+shift+c, ctrl+shift+c', (event, handler) => {
+      event.preventDefault();
+      console.log('Copy shortcut triggered');
+      handlersRef.current.handleCopy();
+    });
+
+    // Clear: Cmd/Ctrl + Shift + Delete/Backspace
+    hotkeys('command+shift+backspace, ctrl+shift+backspace, command+shift+delete, ctrl+shift+delete', (event, handler) => {
+      event.preventDefault();
+      console.log('Clear shortcut triggered');
+      handlersRef.current.handleClear();
+    });
+
+    // Search: Cmd/Ctrl + H
+    hotkeys('command+h, ctrl+h', (event, handler) => {
+      event.preventDefault();
+      console.log('Search shortcut triggered');
+      handlersRef.current.handleSearch();
+    });
+
+    // Save: Cmd/Ctrl + S
+    hotkeys('command+s, ctrl+s', (event, handler) => {
+      event.preventDefault();
+      console.log('Save shortcut triggered');
+      handlersRef.current.handleDownload();
+    });
+
+    // Upload: Cmd/Ctrl + O
+    hotkeys('command+o, ctrl+o', (event, handler) => {
+      event.preventDefault();
+      console.log('Upload shortcut triggered');
+      handlersRef.current.handleUpload();
+    });
+
+    return () => {
+      hotkeys.unbind('command+shift+f, ctrl+shift+f');
+      hotkeys.unbind('command+m, ctrl+m');
+      hotkeys.unbind('command+shift+c, ctrl+shift+c');
+      hotkeys.unbind('command+shift+backspace, ctrl+shift+backspace, command+shift+delete, ctrl+shift+delete');
+      hotkeys.unbind('command+h, ctrl+h');
+      hotkeys.unbind('command+s, ctrl+s');
+      hotkeys.unbind('command+o, ctrl+o');
+    };
+  }, []); // Empty dependency array - bind only once
 
   // Get current data for tree view
   const { data: parsedData } = parseJSONSafe(input);
@@ -769,7 +799,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Upload File <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.UPLOAD)})</span></p>
+                <p>Upload File (Cmd+O)</p>
               </TooltipContent>
             </Tooltip>
 
@@ -780,7 +810,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Format <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.FORMAT)})</span></p>
+                <p>Format JSON (Cmd+Shift+F)</p>
               </TooltipContent>
             </Tooltip>
 
@@ -791,7 +821,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Minify <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.MINIFY)})</span></p>
+                <p>Minify JSON (Cmd+M)</p>
               </TooltipContent>
             </Tooltip>
 
@@ -804,7 +834,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Copy <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.COPY)})</span></p>
+                <p>Copy to Clipboard (Cmd+Shift+C)</p>
               </TooltipContent>
             </Tooltip>
 
@@ -815,7 +845,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Save <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.SAVE)})</span></p>
+                <p>Download JSON (Cmd+S)</p>
               </TooltipContent>
             </Tooltip>
 
@@ -826,7 +856,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Clear <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.CLEAR)})</span></p>
+                <p>Clear Input (Cmd+Shift+Del)</p>
               </TooltipContent>
             </Tooltip>
 
@@ -912,7 +942,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 ref={fileInputRef}
                 type="file"
                 accept=".json,.csv"
-                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                onChange={handleFileUpload}
                 className="hidden"
               />
             </div>
