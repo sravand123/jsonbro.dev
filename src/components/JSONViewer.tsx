@@ -34,6 +34,7 @@ import {
   Columns
 } from 'lucide-react';
 import { GitHubStars } from './GitHubStars';
+import { DownloadDropdown } from './DownloadDropdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,6 +44,7 @@ import {
   minifyJSON,
   copyToClipboard,
   downloadJSON,
+  downloadCSV,
   parseJSONFile,
   parseCSVFile,
   searchJSON,
@@ -544,6 +546,31 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     addToast('JSON downloaded', 'success');
   }, [input, addToast]);
 
+  const handleDownloadCSV = useCallback(() => {
+    if (!input.trim()) {
+      addToast('No JSON to download', 'error');
+      return;
+    }
+
+    // Validate before downloading - only show error if invalid
+    const { data, error: parseError } = parseJSONSafe(input);
+    if (parseError) {
+      addToast('Invalid JSON - Cannot download invalid syntax', 'error');
+      return;
+    }
+
+    try {
+      const filename = data && typeof data === 'object' && Object.keys(data).length > 0
+        ? `formatted_${Date.now()}.csv`
+        : 'formatted.csv';
+
+      downloadCSV(input, filename);
+      addToast('CSV downloaded', 'success');
+    } catch (err) {
+      addToast('Failed to convert to CSV - Data must be an array or object', 'error');
+    }
+  }, [input, addToast]);
+
   const handleFileUpload = useCallback(async (file: File) => {
     const fileName = file.name.toLowerCase();
     const isJSON = fileName.endsWith('.json');
@@ -742,9 +769,13 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleDownload} className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground">
-                  <Download className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7" />
-                </Button>
+                <div>
+                  <DownloadDropdown
+                    onDownloadJSON={handleDownload}
+                    onDownloadCSV={handleDownloadCSV}
+                    className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground"
+                  />
+                </div>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
                 <p>Save <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.SAVE)})</span></p>

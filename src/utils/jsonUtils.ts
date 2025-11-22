@@ -314,6 +314,38 @@ export function downloadJSON(data: any, filename: string = 'formatted.json') {
 }
 
 /**
+ * Download JSON as CSV file
+ */
+export function downloadCSV(data: any, filename: string = 'formatted.csv') {
+  try {
+    // Parse the data if it's a string
+    const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+
+    // Convert to array if it's a single object
+    const arrayData = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+    // Use PapaParse to convert JSON to CSV
+    const csv = Papa.unparse(arrayData);
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Failed to download CSV:', error);
+    throw error;
+  }
+}
+
+
+/**
  * Validate and parse file content
  */
 export async function parseJSONFile(file: File): Promise<{ data: any; error: JSONError | null }> {
