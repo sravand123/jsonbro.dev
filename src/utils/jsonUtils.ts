@@ -24,7 +24,7 @@ export function parseJSONSafe(jsonString: string): { data: any; error: JSONError
       const message = error.message;
       const line = extractLineNumber(message);
       const column = extractColumnNumber(message);
-      
+
       return {
         data: null,
         error: {
@@ -114,7 +114,7 @@ export function convertToTree(data: any, path: string = ''): JSONNode[] {
       type: 'array',
       path: path || 'root'
     });
-    
+
     data.forEach((item, index) => {
       nodes.push(...convertToTree(item, `${path}[${index}]`));
     });
@@ -156,7 +156,7 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
       }
       return;
     }
-    
+
     // Handle string values
     if (typeof obj === 'string') {
       if (obj.toLowerCase().includes(searchLower)) {
@@ -168,7 +168,7 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
       }
       return;
     }
-    
+
     // Handle number values
     if (typeof obj === 'number') {
       if (obj.toString().includes(searchTerm)) {
@@ -180,7 +180,7 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
       }
       return;
     }
-    
+
     // Handle boolean values
     if (typeof obj === 'boolean') {
       const boolStr = obj.toString();
@@ -193,7 +193,7 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
       }
       return;
     }
-    
+
     // Handle arrays
     if (Array.isArray(obj)) {
       obj.forEach((item, index) => {
@@ -202,26 +202,26 @@ export function searchJSON(data: any, searchTerm: string): JSONNode[] {
       });
       return;
     }
-    
+
     // Handle objects
     if (typeof obj === 'object') {
       Object.keys(obj).forEach(key => {
         const keyPath = path === 'root' ? `root.${key}` : `${path}.${key}`;
-        
+
         // Check if key matches search term
         if (key.toLowerCase().includes(searchLower)) {
           results.push({
             key,
             value: obj[key],
-            type: typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key]) 
-              ? 'object' 
-              : Array.isArray(obj[key]) 
-              ? 'array' 
-              : typeof obj[key] as 'string' | 'number' | 'boolean' | 'null',
+            type: typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])
+              ? 'object'
+              : Array.isArray(obj[key])
+                ? 'array'
+                : typeof obj[key] as 'string' | 'number' | 'boolean' | 'null',
             path: keyPath
           });
         }
-        
+
         // Recursively search the value
         searchRecursive(obj[key], keyPath);
       });
@@ -253,14 +253,14 @@ function extractColumnNumber(message: string): number | undefined {
  */
 function calculatePosition(text: string, line?: number, column?: number): number {
   if (!line || !column) return 0;
-  
+
   const lines = text.split('\n');
   let position = 0;
-  
+
   for (let i = 0; i < line - 1 && i < lines.length; i++) {
     position += lines[i].length + 1; // +1 for newline character
   }
-  
+
   return position + Math.max(0, column - 1);
 }
 
@@ -297,14 +297,14 @@ export function downloadJSON(data: any, filename: string = 'formatted.json') {
     const jsonString = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Failed to download file:', error);
@@ -317,7 +317,7 @@ export function downloadJSON(data: any, filename: string = 'formatted.json') {
 export async function parseJSONFile(file: File): Promise<{ data: any; error: JSONError | null }> {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    
+
     reader.onload = (event) => {
       const content = event.target?.result as string;
       if (!content) {
@@ -327,18 +327,18 @@ export async function parseJSONFile(file: File): Promise<{ data: any; error: JSO
         });
         return;
       }
-      
+
       const result = parseJSONSafe(content);
       resolve(result);
     };
-    
+
     reader.onerror = () => {
       resolve({
         data: null,
         error: { message: 'Failed to read file' }
       });
     };
-    
+
     reader.readAsText(file);
   });
 }
@@ -366,7 +366,8 @@ export const KEYBOARD_SHORTCUTS = {
   COPY: { ctrl: true, shift: true, key: 'c', description: 'Copy to clipboard' },
   CLEAR: { ctrl: true, shift: true, key: 'delete', description: 'Clear input' },
   SEARCH: { ctrl: true, key: 'h', description: 'Focus search' },
-  SAVE: { ctrl: true, key: 's', description: 'Download JSON' }
+  SAVE: { ctrl: true, key: 's', description: 'Download JSON' },
+  UPLOAD: { ctrl: true, key: 'o', description: 'Upload file' }
 } as const;
 
 /**
@@ -383,7 +384,7 @@ export function isShortcut(event: KeyboardEvent, shortcut: typeof KEYBOARD_SHORT
   // Check if we're in an input or textarea
   const target = event.target as HTMLElement;
   const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-  
+
   // If we're in an input/textarea but not in the Monaco editor, don't trigger
   if (isInput && !(target as any).__isMonacoEditor) {
     return false;
@@ -391,27 +392,27 @@ export function isShortcut(event: KeyboardEvent, shortcut: typeof KEYBOARD_SHORT
 
   // Check if we're in Monaco editor
   const isMonacoEditor = (target as any).__isMonacoEditor;
-  
+
   // If we're in Monaco editor, allow our custom shortcuts and block standard ones
   if (isMonacoEditor) {
     // Check if this matches one of our custom shortcuts
-    const matchedShortcut = Object.values(KEYBOARD_SHORTCUTS).find(s => 
-      (event.ctrlKey || event.metaKey) && 
-      !event.altKey && 
+    const matchedShortcut = Object.values(KEYBOARD_SHORTCUTS).find(s =>
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
       event.shiftKey === ((s as any).shift || false) &&
-      (s.key === 'delete' 
+      (s.key === 'delete'
         ? (event.key === 'Delete' || event.key === 'Backspace')
         : event.key.toLowerCase() === s.key.toLowerCase())
     );
-    
+
     // If it's one of our shortcuts, allow it to proceed
     if (matchedShortcut && matchedShortcut.key === shortcut.key) {
       // Continue to the shortcut checking below
     } else {
       // For standard shortcuts (copy, paste, etc.), let Monaco handle them
       const standardShortcuts = ['c', 'v', 'x', 'a', 'z', 'y', 'f'];
-      if (standardShortcuts.includes(shortcut.key.toLowerCase()) && 
-          (event.ctrlKey || event.metaKey)) {
+      if (standardShortcuts.includes(shortcut.key.toLowerCase()) &&
+        (event.ctrlKey || event.metaKey)) {
         return false; // Let Monaco handle these
       }
       // For other key combinations, don't handle them
@@ -422,10 +423,10 @@ export function isShortcut(event: KeyboardEvent, shortcut: typeof KEYBOARD_SHORT
   // Check the actual shortcut
   const modifierPressed = event.ctrlKey || event.metaKey;
   const shiftRequired = (shortcut as any).shift || false;
-  const keyMatches = shortcut.key === 'delete' 
+  const keyMatches = shortcut.key === 'delete'
     ? (event.key === 'Delete' || event.key === 'Backspace')
     : event.key.toLowerCase() === shortcut.key.toLowerCase();
-  
+
   return (
     modifierPressed &&
     !event.altKey &&

@@ -262,6 +262,9 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       } else if (isShortcut(event, KEYBOARD_SHORTCUTS.SAVE)) {
         event.preventDefault();
         handleDownload();
+      } else if (isShortcut(event, KEYBOARD_SHORTCUTS.UPLOAD)) {
+        event.preventDefault();
+        fileInputRef.current?.click();
       }
     };
 
@@ -682,7 +685,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
-                <p>Upload File</p>
+                <p>Upload File <span className="text-muted-foreground ml-1">({getShortcutText(KEYBOARD_SHORTCUTS.UPLOAD)})</span></p>
               </TooltipContent>
             </Tooltip>
 
