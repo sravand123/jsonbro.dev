@@ -105,8 +105,12 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [viewMode, setViewMode] = useState<'formatted' | 'diff'>('formatted');
   const [isFormatting, setIsFormatting] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [isLeftRepairing, setIsLeftRepairing] = useState(false);
+  const [isRightRepairing, setIsRightRepairing] = useState(false);
   const [isHoveringEditor, setIsHoveringEditor] = useState(false);
   const [canRepair, setCanRepair] = useState(false);
+  const [canRepairLeft, setCanRepairLeft] = useState(false);
+  const [canRepairRight, setCanRepairRight] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [currentPath, setCurrentPath] = useState('');
@@ -212,51 +216,64 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   }, [editorSettings]);
 
   // Debounce function for JSON validation and repair check
-  const debounce = useCallback(<F extends (...args: any[]) => void>(
+  const debounce = useCallback(<F extends (...args: any[]) => any>(
     func: F,
     wait: number
   ) => {
     let timeout: NodeJS.Timeout;
-    return (...args: Parameters<F>) => {
+    const debounced = (...args: Parameters<F>) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => func(...args), wait);
     };
+    debounced.cancel = () => clearTimeout(timeout);
+    return debounced as F & { cancel: () => void };
   }, []);
 
   // Validate JSON when input changes and check if it can be repaired
   useEffect(() => {
-    const validateAndCheckRepair = () => {
-      if (input.trim() === '') {
-        setValidationStatus('empty');
+    const validateAndCheckRepair = (content: string, setCanRepair: (value: boolean) => void) => {
+      if (content.trim() === '') {
         setCanRepair(false);
-        return;
+        return 'empty' as const;
       }
 
       try {
-        JSON.parse(input);
-        setValidationStatus('valid');
+        JSON.parse(content);
         setCanRepair(false);
+        return 'valid' as const;
       } catch (error) {
-        setValidationStatus('invalid');
         // Check if the JSON can be repaired
         try {
-          const repaired = jsonrepair(input);
+          const repaired = jsonrepair(content);
           JSON.parse(repaired);
           setCanRepair(true);
         } catch (repairError) {
           setCanRepair(false);
         }
+        return 'invalid' as const;
       }
     };
 
-    const debouncedValidation = debounce(validateAndCheckRepair, 1000);
-    debouncedValidation();
+    // Create a debounced version of the validation
+    const debouncedValidate = debounce(() => {
+      // Validate main editor
+      setValidationStatus(validateAndCheckRepair(input, setCanRepair));
+      
+      // Validate left and right editors in compare mode
+      if (viewMode === 'diff') {
+        validateAndCheckRepair(leftInput, setCanRepairLeft);
+        validateAndCheckRepair(rightInput, setCanRepairRight);
+      }
+    }, 500);
+
+    // Call the debounced validation
+    debouncedValidate();
 
     // Cleanup function to clear any pending debounced calls
     return () => {
-      // The timeout is automatically cleared by the debounce function
+      debouncedValidate.cancel();
     };
-  }, [input]);
+  }, [input, leftInput, rightInput, viewMode, setCanRepair, setCanRepairLeft, setCanRepairRight]);
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -819,6 +836,52 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     }
   }, [input, editorSettings.tabSize, addToast]);
 
+  const handleRepairLeftJSON = useCallback(() => {
+    if (leftInput.trim() === '') return;
+
+    setIsLeftRepairing(true);
+    try {
+      // Try to repair the JSON using jsonrepair
+      const repaired = jsonrepair(leftInput);
+      
+      // Format the repaired JSON
+      const { data, error } = parseJSONSafe(repaired);
+      if (error) throw error;
+      
+      const formatted = formatJSON(data, editorSettings.tabSize);
+      setLeftInput(formatted);
+      addToast('Left JSON repaired and formatted successfully!', 'success');
+    } catch (error) {
+      console.error('Error repairing left JSON:', error);
+      addToast('Failed to repair left JSON: ' + (error as Error).message, 'error');
+    } finally {
+      setIsLeftRepairing(false);
+    }
+  }, [leftInput, editorSettings.tabSize, addToast]);
+
+  const handleRepairRightJSON = useCallback(() => {
+    if (rightInput.trim() === '') return;
+
+    setIsRightRepairing(true);
+    try {
+      // Try to repair the JSON using jsonrepair
+      const repaired = jsonrepair(rightInput);
+      
+      // Format the repaired JSON
+      const { data, error } = parseJSONSafe(repaired);
+      if (error) throw error;
+      
+      const formatted = formatJSON(data, editorSettings.tabSize);
+      setRightInput(formatted);
+      addToast('Right JSON repaired and formatted successfully!', 'success');
+    } catch (error) {
+      console.error('Error repairing right JSON:', error);
+      addToast('Failed to repair right JSON: ' + (error as Error).message, 'error');
+    } finally {
+      setIsRightRepairing(false);
+    }
+  }, [rightInput, editorSettings.tabSize, addToast]);
+
   const handlePaste = useCallback((e: React.ClipboardEvent, setValue: (value: string) => void) => {
     if (!e.clipboardData) return;
 
@@ -1167,7 +1230,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                         <span className="flex items-center gap-2"><FileCode className="w-3 h-3" /> Original</span>
                         <span className="font-mono opacity-70">{leftInput.length} chars</span>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 relative">
                         <div onPaste={handleLeftPaste} className="h-full">
                           <MonacoJSONEditor
                             ref={leftEditorRef}
@@ -1185,6 +1248,40 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                             }}
                           />
                         </div>
+                        {canRepairLeft && (
+                          <div className="absolute bottom-4 left-4 z-10">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="relative">
+                                  <div className="absolute inset-0 rounded-full bg-amber-500/30 animate-ping-slow" />
+                                  <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-pulse-slow" />
+                                  <Button
+                                    variant="default"
+                                    size="icon"
+                                    onClick={handleRepairLeftJSON}
+                                    disabled={isLeftRepairing}
+                                    className="relative z-10 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all duration-300 group w-10 h-10 rounded-xl transform hover:scale-105"
+                                  >
+                                    {isLeftRepairing ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <div className="relative">
+                                        <Wand2 className="w-5 h-5 transform group-hover:rotate-12 transition-transform duration-300" />
+                                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-white rounded-full animate-ping opacity-75" />
+                                      </div>
+                                    )}
+                                  </Button>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="bg-amber-50 dark:bg-amber-900 text-amber-900 dark:text-amber-100 border-amber-200 dark:border-amber-800 shadow-lg text-xs">
+                                <p className="flex items-center gap-1 font-medium">
+                                  <Wand2 className="h-3 w-3 mr-1.5 text-amber-600 dark:text-amber-400" />
+                                  Fix JSON errors
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex-1 flex flex-col">
@@ -1192,7 +1289,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                         <span className="flex items-center gap-2"><FileCheck className="w-3 h-3" /> Modified</span>
                         <span className="font-mono opacity-70">{rightInput.length} chars</span>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 relative">
                         <div onPaste={handleRightPaste} className="h-full">
                           <MonacoJSONEditor
                             ref={rightEditorRef}
@@ -1210,6 +1307,40 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                             }}
                           />
                         </div>
+                        {canRepairRight && (
+                          <div className="absolute bottom-4 right-4 z-10">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="relative">
+                                  <div className="absolute inset-0 rounded-full bg-amber-500/30 animate-ping-slow" />
+                                  <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-pulse-slow" />
+                                  <Button
+                                    variant="default"
+                                    size="icon"
+                                    onClick={handleRepairRightJSON}
+                                    disabled={isRightRepairing}
+                                    className="relative z-10 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all duration-300 group w-10 h-10 rounded-xl transform hover:scale-105"
+                                  >
+                                    {isRightRepairing ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <div className="relative">
+                                        <Wand2 className="w-5 h-5 transform group-hover:rotate-12 transition-transform duration-300" />
+                                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-white rounded-full animate-ping opacity-75" />
+                                      </div>
+                                    )}
+                                  </Button>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="bg-amber-50 dark:bg-amber-900 text-amber-900 dark:text-amber-100 border-amber-200 dark:border-amber-800 shadow-lg text-xs">
+                                <p className="flex items-center gap-1 font-medium">
+                                  <Wand2 className="h-3 w-3 mr-1.5 text-amber-600 dark:text-amber-400" />
+                                  Fix JSON errors
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
