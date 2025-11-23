@@ -657,72 +657,74 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
   // Setup keyboard shortcuts - bind only once
   useEffect(() => {
-    // Configure hotkeys to work inside input/textarea/contenteditable
+    // Configure hotkeys to work reliably on Windows and Mac
     hotkeys.filter = function (event) {
-      const target = (event.target || event.srcElement) as HTMLElement;
-      // Always allow hotkeys, even in inputs
+      // Always process hotkeys, even in form fields
       return true;
-    }
-
-    // Format: Cmd/Ctrl + Shift + F
-    hotkeys('command+shift+f, ctrl+shift+f', (event, handler) => {
-      event.preventDefault();
-      console.log('Format shortcut triggered');
-      handlersRef.current.handleFormat();
-    });
-
-    // Minify: Cmd/Ctrl + M
-    hotkeys('command+m, ctrl+m', (event, handler) => {
-      event.preventDefault();
-      console.log('Minify shortcut triggered');
-      handlersRef.current.handleMinify();
-    });
-
-    // Copy: Cmd/Ctrl + Shift + C
-    hotkeys('command+shift+c, ctrl+shift+c', (event, handler) => {
-      event.preventDefault();
-      console.log('Copy shortcut triggered');
-      handlersRef.current.handleCopy();
-    });
-
-    // Clear: Cmd/Ctrl + Shift + Delete/Backspace
-    hotkeys('command+shift+backspace, ctrl+shift+backspace, command+shift+delete, ctrl+shift+delete', (event, handler) => {
-      event.preventDefault();
-      console.log('Clear shortcut triggered');
-      handlersRef.current.handleClear();
-    });
-
-    // Search: Cmd/Ctrl + H
-    hotkeys('command+h, ctrl+h', (event, handler) => {
-      event.preventDefault();
-      console.log('Search shortcut triggered');
-      handlersRef.current.handleSearch();
-    });
-
-    // Save: Cmd/Ctrl + S
-    hotkeys('command+s, ctrl+s', (event, handler) => {
-      event.preventDefault();
-      console.log('Save shortcut triggered');
-      handlersRef.current.handleDownload();
-    });
-
-    // Upload: Cmd/Ctrl + O
-    hotkeys('command+o, ctrl+o', (event, handler) => {
-      event.preventDefault();
-      console.log('Upload shortcut triggered');
-      handlersRef.current.handleUpload();
-    });
-
-    return () => {
-      hotkeys.unbind('command+shift+f, ctrl+shift+f');
-      hotkeys.unbind('command+m, ctrl+m');
-      hotkeys.unbind('command+shift+c, ctrl+shift+c');
-      hotkeys.unbind('command+shift+backspace, ctrl+shift+backspace, command+shift+delete, ctrl+shift+delete');
-      hotkeys.unbind('command+h, ctrl+h');
-      hotkeys.unbind('command+s, ctrl+s');
-      hotkeys.unbind('command+o, ctrl+o');
     };
-  }, []); // Empty dependency array - bind only once
+
+    // Use a more reliable way to detect platform
+    const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+    const modKey = isMac ? 'command' : 'ctrl';
+
+    // Define hotkey combinations using handlersRef
+    const hotkeyMap = [
+      { 
+        keys: `${modKey}+shift+f`, 
+        action: 'format', 
+        handler: () => handlersRef.current.handleFormat() 
+      },
+      { 
+        keys: `${modKey}+m`, 
+        action: 'minify', 
+        handler: () => handlersRef.current.handleMinify() 
+      },
+      { 
+        keys: `${modKey}+shift+c`, 
+        action: 'copy', 
+        handler: () => handlersRef.current.handleCopy() 
+      },
+      { 
+        keys: `${modKey}+shift+backspace,${modKey}+shift+delete`, 
+        action: 'clear', 
+        handler: () => handlersRef.current.handleClear() 
+      },
+      { 
+        keys: `${modKey}+h`, 
+        action: 'search', 
+        handler: () => {
+          searchInputRef.current?.focus();
+          handlersRef.current.handleSearch();
+        } 
+      },
+      { 
+        keys: `${modKey}+s`, 
+        action: 'save', 
+        handler: () => setIsDownloadModalOpen(true) 
+      },
+      { 
+        keys: `${modKey}+o`, 
+        action: 'open', 
+        handler: () => fileInputRef.current?.click() 
+      }
+    ];
+
+    // Bind all hotkeys
+    hotkeyMap.forEach(({ keys, action, handler }) => {
+      hotkeys(keys, (event) => {
+        event.preventDefault();
+        console.log(`${action} shortcut triggered`);
+        handler();
+      });
+    });
+
+    // Cleanup function
+    return () => {
+      hotkeyMap.forEach(({ keys }) => {
+        hotkeys.unbind(keys);
+      });
+    };
+  }, []); // No dependencies since we're using handlersRef
 
   // Get current data for tree view
   const { data: parsedData } = parseJSONSafe(input);
