@@ -1250,44 +1250,151 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
         {/* Footer Status Bar */}
         <footer className="flex items-center justify-between px-4 3xl:px-8 4xl:px-12 5xl:px-16 py-2 3xl:py-2.5 4xl:py-3 5xl:py-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 text-[11px] 3xl:text-xs 4xl:text-sm 5xl:text-base font-medium text-muted-foreground select-none h-9 3xl:h-10 4xl:h-12 5xl:h-14 shrink-0">
-          <div className="flex items-center gap-3 3xl:gap-4 4xl:gap-5">
-            <div className="flex items-center gap-2 text-primary font-semibold">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
-              JSON
-            </div>
-            <div className="w-px h-3 bg-border" />
-            {validationStatus === 'valid' && (
-              <div className="flex items-center gap-1.5 text-green-500">
-                <CheckCircle className="w-3 h-3 3xl:w-3.5 3xl:h-3.5 4xl:w-4 4xl:h-4 5xl:w-5 5xl:h-5" />
-                Valid
-              </div>
-            )}
-            {validationStatus === 'invalid' && (
-              <div className="flex items-center gap-1.5 text-destructive">
-                <AlertCircle className="w-3 h-3 3xl:w-3.5 3xl:h-3.5 4xl:w-4 4xl:h-4 5xl:w-5 5xl:h-5" />
-                Invalid
-              </div>
-            )}
-            {validationStatus === 'empty' && (
-              <div className="flex items-center gap-1.5 text-muted-foreground opacity-70">
-                Empty
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 3xl:gap-4 4xl:gap-5 5xl:gap-6 font-mono opacity-80">
-            <span>{new TextEncoder().encode(input).length} bytes</span>
-            <div className="w-px h-3 bg-border" />
-            <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
-            {currentPath && (
-              <>
+          {viewMode === 'formatted' ? (
+            <>
+              {/* Single editor view */}
+              <div className="flex items-center gap-3 3xl:gap-4 4xl:gap-5">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
+                  JSON
+                </div>
                 <div className="w-px h-3 bg-border" />
-                <span className="text-primary truncate max-w-[300px]" title={currentPath}>{currentPath}</span>
-              </>
-            )}
-            <div className="w-px h-3 bg-border" />
-            <span>UTF-8</span>
-          </div>
+                {validationStatus === 'valid' && (
+                  <div className="flex items-center gap-1.5 text-green-500">
+                    <CheckCircle className="w-3 h-3" />
+                    Valid
+                  </div>
+                )}
+                {validationStatus === 'invalid' && (
+                  <div className="flex items-center gap-1.5 text-destructive">
+                    <AlertCircle className="w-3 h-3" />
+                    Invalid
+                  </div>
+                )}
+                {validationStatus === 'empty' && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground opacity-70">
+                    Empty
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 3xl:gap-4 4xl:gap-5 5xl:gap-6 font-mono opacity-80">
+                <span>{new TextEncoder().encode(input).length} bytes</span>
+                <div className="w-px h-3 bg-border" />
+                <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+                {currentPath && (
+                  <>
+                    <div className="w-px h-3 bg-border" />
+                    <span className="text-primary truncate max-w-[300px]" title={currentPath}>{currentPath}</span>
+                  </>
+                )}
+                <div className="w-px h-3 bg-border" />
+                <span>UTF-8</span>
+              </div>
+            </>
+          ) : showDiff ? (
+            /* Diff view */
+            <div className="w-full flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-foreground">
+                <GitCompare className="w-3.5 h-3.5" />
+                {totalDiffs > 0 ? `${totalDiffs} changes` : 'No changes'}
+              </div>
+              <div className="flex items-center gap-3 3xl:gap-4 4xl:gap-5 5xl:gap-6 font-mono opacity-80">
+                <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+              </div>
+            </div>
+          ) : (
+            /* Compare view - Two separate status bars */
+            <div className="w-full flex items-center justify-between gap-4">
+              {/* Left editor status */}
+              <div className="flex-1 flex items-center justify-between pr-4 border-r border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-green-500 font-semibold">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    ORIGINAL
+                  </div>
+                  <div className="w-px h-3 bg-border" />
+                  {(() => {
+                    try {
+                      const json = JSON.parse(leftInput || '{}');
+                      return (
+                        <div className="flex items-center gap-1.5 text-green-500">
+                          <CheckCircle className="w-3 h-3" />
+                          <span className="text-xs">Valid JSON</span>
+                        </div>
+                      );
+                    } catch (e) {
+                      return leftInput.trim() ? (
+                        <div className="flex items-center gap-1.5 text-destructive">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="text-xs">Invalid JSON</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-muted-foreground opacity-70 text-xs">
+                          Empty
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{new TextEncoder().encode(leftInput).length} bytes</span>
+                  <div className="w-px h-3 bg-border" />
+                  <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+                  <div className="w-px h-3 bg-border" />
+                  <span>UTF-8</span>
+                </div>
+              </div>
+
+              {/* Right editor status */}
+              <div className="flex-1 flex items-center justify-between pl-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-blue-500 font-semibold">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    MODIFIED
+                  </div>
+                  <div className="w-px h-3 bg-border" />
+                  {(() => {
+                    try {
+                      const json = JSON.parse(rightInput || '{}');
+                      return (
+                        <div className="flex items-center gap-1.5 text-green-500">
+                          <CheckCircle className="w-3 h-3" />
+                          <span className="text-xs">Valid JSON</span>
+                        </div>
+                      );
+                    } catch (e) {
+                      return rightInput.trim() ? (
+                        <div className="flex items-center gap-1.5 text-destructive">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="text-xs">Invalid JSON</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-muted-foreground opacity-70 text-xs">
+                          Empty
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{new TextEncoder().encode(rightInput).length} bytes</span>
+                  <div className="w-px h-3 bg-border" />
+                  <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+                  {currentPath && (
+                    <>
+                      <div className="w-px h-3 bg-border" />
+                      <span className="text-primary truncate max-w-[200px]" title={currentPath}>
+                        {currentPath}
+                      </span>
+                    </>
+                  )}
+                  <div className="w-px h-3 bg-border" />
+                  <span>UTF-8</span>
+                </div>
+              </div>
+            </div>
+          )}
         </footer>
 
         {/* Toasts */}
