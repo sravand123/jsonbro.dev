@@ -819,6 +819,42 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     }
   }, [input, editorSettings.tabSize, addToast]);
 
+  const handlePaste = useCallback((e: React.ClipboardEvent, setValue: (value: string) => void) => {
+    if (!e.clipboardData) return;
+
+    const text = e.clipboardData.getData('text/plain');
+    if (!text) return;
+
+    try {
+      // Try to parse the pasted text as JSON
+      const parsed = JSON.parse(text);
+      // If successful, format it with the current settings
+      const formatted = JSON.stringify(parsed, null, editorSettings.tabSize);
+      
+      // Prevent the default paste
+      e.preventDefault();
+      
+      // Update the corresponding state
+      setValue(formatted);
+      
+      // Show success message
+      addToast('Pasted and formatted JSON', 'success');
+      return true;
+    } catch (err) {
+      // If not valid JSON, let the default paste behavior happen
+      console.log('Pasted text is not valid JSON, using default paste behavior');
+      return false;
+    }
+  }, [addToast, editorSettings.tabSize]);
+
+  const handleLeftPaste = useCallback((e: React.ClipboardEvent) => {
+    handlePaste(e, setLeftInput);
+  }, [handlePaste]);
+
+  const handleRightPaste = useCallback((e: React.ClipboardEvent) => {
+    handlePaste(e, setRightInput);
+  }, [handlePaste]);
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen bg-background font-sans text-foreground overflow-hidden selection:bg-primary/10">
@@ -1132,21 +1168,23 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                         <span className="font-mono opacity-70">{leftInput.length} chars</span>
                       </div>
                       <div className="flex-1">
-                        <MonacoJSONEditor
-                          ref={leftEditorRef}
-                          value={leftInput}
-                          onChange={(value) => setLeftInput(value || '')}
-                          theme={theme}
-                          height="100%"
-                          options={{
-                            minimap: { enabled: false },
-                            fontSize: editorSettings.fontSize === 'auto'
-                              ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
-                              : editorSettings.fontSize,
-                            lineHeight: editorSettings.lineHeight,
-                            tabSize: editorSettings.tabSize,
-                          }}
-                        />
+                        <div onPaste={handleLeftPaste} className="h-full">
+                          <MonacoJSONEditor
+                            ref={leftEditorRef}
+                            value={leftInput}
+                            onChange={(value) => setLeftInput(value || '')}
+                            theme={theme}
+                            height="100%"
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: editorSettings.fontSize === 'auto'
+                                ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                                : editorSettings.fontSize,
+                              lineHeight: editorSettings.lineHeight,
+                              tabSize: editorSettings.tabSize,
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="flex-1 flex flex-col">
@@ -1155,21 +1193,23 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                         <span className="font-mono opacity-70">{rightInput.length} chars</span>
                       </div>
                       <div className="flex-1">
-                        <MonacoJSONEditor
-                          ref={rightEditorRef}
-                          value={rightInput}
-                          onChange={(value) => setRightInput(value || '')}
-                          theme={theme}
-                          height="100%"
-                          options={{
-                            minimap: { enabled: false },
-                            fontSize: editorSettings.fontSize === 'auto'
-                              ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
-                              : editorSettings.fontSize,
-                            lineHeight: editorSettings.lineHeight,
-                            tabSize: editorSettings.tabSize,
-                          }}
-                        />
+                        <div onPaste={handleRightPaste} className="h-full">
+                          <MonacoJSONEditor
+                            ref={rightEditorRef}
+                            value={rightInput}
+                            onChange={(value) => setRightInput(value || '')}
+                            theme={theme}
+                            height="100%"
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: editorSettings.fontSize === 'auto'
+                                ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                                : editorSettings.fontSize,
+                              lineHeight: editorSettings.lineHeight,
+                              tabSize: editorSettings.tabSize,
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
