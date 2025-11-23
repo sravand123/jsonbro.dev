@@ -106,6 +106,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [isFormatting, setIsFormatting] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
   const [isHoveringEditor, setIsHoveringEditor] = useState(false);
+  const [canRepair, setCanRepair] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [currentPath, setCurrentPath] = useState('');
@@ -210,24 +211,51 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     }
   }, [editorSettings]);
 
+  // Debounce function for JSON validation and repair check
+  const debounce = useCallback(<F extends (...args: any[]) => void>(
+    func: F,
+    wait: number
+  ) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: Parameters<F>) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  }, []);
 
+  // Validate JSON when input changes and check if it can be repaired
   useEffect(() => {
-    // Only update passive validation status, don't set error states
-    if (input.trim() === '') {
-      setValidationStatus('empty');
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      try {
-        const { data, error: parseError } = parseJSONSafe(input);
-        setValidationStatus(parseError ? 'invalid' : 'valid');
-      } catch (err) {
-        setValidationStatus('invalid');
+    const validateAndCheckRepair = () => {
+      if (input.trim() === '') {
+        setValidationStatus('empty');
+        setCanRepair(false);
+        return;
       }
-    }, 500); // Longer debounce for less intrusive validation
 
-    return () => clearTimeout(timer);
+      try {
+        JSON.parse(input);
+        setValidationStatus('valid');
+        setCanRepair(false);
+      } catch (error) {
+        setValidationStatus('invalid');
+        // Check if the JSON can be repaired
+        try {
+          const repaired = jsonrepair(input);
+          JSON.parse(repaired);
+          setCanRepair(true);
+        } catch (repairError) {
+          setCanRepair(false);
+        }
+      }
+    };
+
+    const debouncedValidation = debounce(validateAndCheckRepair, 1000);
+    debouncedValidation();
+
+    // Cleanup function to clear any pending debounced calls
+    return () => {
+      // The timeout is automatically cleared by the debounce function
+    };
   }, [input]);
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
@@ -1000,7 +1028,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   onCopyPath={(path) => toast.success(`Path copied: ${path}`)}
                 />
                 
-                {validationStatus === 'invalid' && input.trim() !== '' && (
+                {validationStatus === 'invalid' && canRepair && (
                   <div className="absolute bottom-4 left-4">
                     <Tooltip>
                       <TooltipTrigger asChild>
