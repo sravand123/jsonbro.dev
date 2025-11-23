@@ -37,7 +37,8 @@ import {
   Scaling,
   Split,
   Columns,
-  Settings
+  Settings,
+  Wand2
 } from 'lucide-react';
 import hotkeys from 'hotkeys-js';
 import { GitHubStars } from './GitHubStars';
@@ -47,6 +48,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { jsonrepair } from 'jsonrepair';
 import {
   parseJSONSafe,
   formatJSON,
@@ -102,6 +104,8 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [editorInstance, setEditorInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [viewMode, setViewMode] = useState<'formatted' | 'diff'>('formatted');
   const [isFormatting, setIsFormatting] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [isHoveringEditor, setIsHoveringEditor] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [currentPath, setCurrentPath] = useState('');
@@ -762,6 +766,29 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     }
   };
 
+  const handleRepairJSON = useCallback(() => {
+    if (input.trim() === '') return;
+
+    setIsRepairing(true);
+    try {
+      // Try to repair the JSON using jsonrepair
+      const repaired = jsonrepair(input);
+      
+      // Format the repaired JSON
+      const { data, error } = parseJSONSafe(repaired);
+      if (error) throw error;
+      
+      const formatted = formatJSON(data, editorSettings.tabSize);
+      setInput(formatted);
+      addToast('JSON repaired and formatted successfully!', 'success');
+    } catch (error) {
+      console.error('Error repairing JSON:', error);
+      addToast('Failed to repair JSON: ' + (error as Error).message, 'error');
+    } finally {
+      setIsRepairing(false);
+    }
+  }, [input, editorSettings.tabSize, addToast]);
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen bg-background font-sans text-foreground overflow-hidden selection:bg-primary/10">
@@ -824,8 +851,18 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleFormat} disabled={viewMode === 'diff' || isFormatting} className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground">
-                  {isFormatting ? <Loader2 className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7 animate-spin" /> : <Sparkles className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7" />}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleFormat} 
+                  disabled={viewMode === 'diff' || isFormatting || validationStatus !== 'valid'} 
+                  className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground"
+                >
+                  {isFormatting ? (
+                    <Loader2 className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
@@ -933,28 +970,75 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
           {viewMode === 'formatted' ? (
             <div className="h-full w-full relative group">
-              <MonacoJSONEditor
-                ref={editorRef}
-                value={input}
-                onChange={(value) => setInput(value || '')}
-                theme={theme}
-                height="100%"
-                options={{
-                  minimap: { enabled: true },
-                  padding: { top: 20, bottom: 20 },
-                  fontSize: editorSettings.fontSize === 'auto'
-                    ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
-                    : editorSettings.fontSize,
-                  lineHeight: editorSettings.lineHeight,
-                  scrollBeyondLastLine: false,
-                  tabSize: editorSettings.tabSize,
-                  insertSpaces: true,
-                  wordWrap: 'on',
-                }}
-                onMount={handleEditorDidMount}
-                onPathChange={setCurrentPath}
-                onCopyPath={(path) => toast.success(`Path copied: ${path}`)}
-              />
+              <div 
+                className="relative h-full w-full"
+                onMouseEnter={() => setIsHoveringEditor(true)}
+                onMouseLeave={() => setIsHoveringEditor(false)}
+              >
+                <MonacoJSONEditor
+                  ref={editorRef}
+                  value={input}
+                  onChange={(value) => setInput(value || '')}
+                  theme={theme}
+                  height="100%"
+                  options={{
+                    minimap: { enabled: true },
+                    padding: { top: 20, bottom: 50 },
+                    fontSize: editorSettings.fontSize === 'auto'
+                      ? Math.round(Math.max(14, Math.min(28, 14 + (window.innerWidth - 1280) * 0.006)))
+                      : editorSettings.fontSize,
+                    lineHeight: editorSettings.lineHeight,
+                    scrollBeyondLastLine: false,
+                    tabSize: editorSettings.tabSize,
+                    insertSpaces: true,
+                    wordWrap: 'on',
+                  }}
+                  onMount={handleEditorDidMount}
+                  onPathChange={setCurrentPath}
+                  onCopyPath={(path) => toast.success(`Path copied: ${path}`)}
+                />
+                
+                {validationStatus === 'invalid' && input.trim() !== '' && (
+                  <div className="absolute bottom-4 left-4">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="relative">
+                          {/* Pulsing background effect */}
+                          <div className="absolute inset-0 rounded-full bg-amber-500/30 animate-ping-slow" />
+                          {/* Glow effect */}
+                          <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-pulse-slow" />
+                          
+                          <Button 
+                            variant="default"
+                            size="icon"
+                            onClick={handleRepairJSON}
+                            disabled={isRepairing}
+                            className={`relative z-10 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all duration-300 group w-10 h-10 rounded-xl transform hover:scale-105 ${
+                              isHoveringEditor ? 'opacity-100' : 'opacity-80'
+                            }`}
+                          >
+                            {isRepairing ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <div className="relative">
+                                <Wand2 className="w-5 h-5 transform group-hover:rotate-12 transition-transform duration-300" />
+                                {/* Sparkle effect */}
+                                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-white rounded-full animate-ping opacity-75" />
+                              </div>
+                            )}
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="bg-amber-50 dark:bg-amber-900 text-amber-900 dark:text-amber-100 border-amber-200 dark:border-amber-800 shadow-lg text-xs">
+                        <p className="flex items-center gap-1 font-medium">
+                          <Wand2 className="h-3 w-3 mr-1.5 text-amber-600 dark:text-amber-400" />
+                          Fix JSON errors
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+              </div>
 
 
 
