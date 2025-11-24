@@ -49,18 +49,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { jsonrepair } from 'jsonrepair';
-import {
-  parseJSONSafe,
-  formatJSON,
-  minifyJSON,
-  copyToClipboard,
-  downloadJSON,
-  downloadCSV,
-  parseJSONFile,
-  parseCSVFile,
-  searchJSON,
-  type JSONNode
-} from '../utils/jsonUtils';
+import { parseJSONSafe, formatJSON, minifyJSON, copyToClipboard, downloadJSON, downloadCSV, parseJSONFile, parseCSVFile, searchJSON, sortJSONKeys, formatJSONWithSortedKeys, type JSONNode } from '../utils/jsonUtils';
 import { MonacoJSONEditor } from './MonacoJSONEditor';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import ReactJson from 'react-json-view';
@@ -114,6 +103,27 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [isLoading, setIsLoading] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [currentPath, setCurrentPath] = useState('');
+  const [ignoreKeyOrdering, setIgnoreKeyOrdering] = useState(true);
+
+  const getSortedJsonForDiff = (jsonString: string): string => {
+    if (!ignoreKeyOrdering) return jsonString;
+    try {
+      const parsed = JSON.parse(jsonString);
+      const sorted = sortJSONKeys(parsed);
+      return JSON.stringify(sorted, null, 2);
+    } catch (e) {
+      return jsonString; // Return original if there's an error
+    }
+  };
+
+  // Automatically select first diff when diffs are detected
+  useEffect(() => {
+    if (totalDiffs > 0 && currentDiffIndex === -1) {
+      setCurrentDiffIndex(0);
+    } else if (totalDiffs === 0 && currentDiffIndex !== -1) {
+      setCurrentDiffIndex(-1);
+    }
+  }, [totalDiffs, currentDiffIndex]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -258,7 +268,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     const debouncedValidate = debounce(() => {
       // Validate main editor
       setValidationStatus(validateAndCheckRepair(input, setCanRepair));
-      
+
       // Validate left and right editors in compare mode
       if (viewMode === 'diff') {
         validateAndCheckRepair(leftInput, setCanRepairLeft);
@@ -714,43 +724,43 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
     // Define hotkey combinations using handlersRef
     const hotkeyMap = [
-      { 
-        keys: `${modKey}+shift+f`, 
-        action: 'format', 
-        handler: () => handlersRef.current.handleFormat() 
+      {
+        keys: `${modKey}+shift+f`,
+        action: 'format',
+        handler: () => handlersRef.current.handleFormat()
       },
-      { 
-        keys: `${modKey}+m`, 
-        action: 'minify', 
-        handler: () => handlersRef.current.handleMinify() 
+      {
+        keys: `${modKey}+m`,
+        action: 'minify',
+        handler: () => handlersRef.current.handleMinify()
       },
-      { 
-        keys: `${modKey}+shift+c`, 
-        action: 'copy', 
-        handler: () => handlersRef.current.handleCopy() 
+      {
+        keys: `${modKey}+shift+c`,
+        action: 'copy',
+        handler: () => handlersRef.current.handleCopy()
       },
-      { 
-        keys: `${modKey}+shift+backspace,${modKey}+shift+delete`, 
-        action: 'clear', 
-        handler: () => handlersRef.current.handleClear() 
+      {
+        keys: `${modKey}+shift+backspace,${modKey}+shift+delete`,
+        action: 'clear',
+        handler: () => handlersRef.current.handleClear()
       },
-      { 
-        keys: `${modKey}+h`, 
-        action: 'search', 
+      {
+        keys: `${modKey}+h`,
+        action: 'search',
         handler: () => {
           searchInputRef.current?.focus();
           handlersRef.current.handleSearch();
-        } 
+        }
       },
-      { 
-        keys: `${modKey}+s`, 
-        action: 'save', 
-        handler: () => setIsDownloadModalOpen(true) 
+      {
+        keys: `${modKey}+s`,
+        action: 'save',
+        handler: () => setIsDownloadModalOpen(true)
       },
-      { 
-        keys: `${modKey}+o`, 
-        action: 'open', 
-        handler: () => fileInputRef.current?.click() 
+      {
+        keys: `${modKey}+o`,
+        action: 'open',
+        handler: () => fileInputRef.current?.click()
       }
     ];
 
@@ -820,11 +830,11 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     try {
       // Try to repair the JSON using jsonrepair
       const repaired = jsonrepair(input);
-      
+
       // Format the repaired JSON
       const { data, error } = parseJSONSafe(repaired);
       if (error) throw error;
-      
+
       const formatted = formatJSON(data, editorSettings.tabSize);
       setInput(formatted);
       addToast('JSON repaired and formatted successfully!', 'success');
@@ -843,11 +853,11 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     try {
       // Try to repair the JSON using jsonrepair
       const repaired = jsonrepair(leftInput);
-      
+
       // Format the repaired JSON
       const { data, error } = parseJSONSafe(repaired);
       if (error) throw error;
-      
+
       const formatted = formatJSON(data, editorSettings.tabSize);
       setLeftInput(formatted);
       addToast('Left JSON repaired and formatted successfully!', 'success');
@@ -866,11 +876,11 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     try {
       // Try to repair the JSON using jsonrepair
       const repaired = jsonrepair(rightInput);
-      
+
       // Format the repaired JSON
       const { data, error } = parseJSONSafe(repaired);
       if (error) throw error;
-      
+
       const formatted = formatJSON(data, editorSettings.tabSize);
       setRightInput(formatted);
       addToast('Right JSON repaired and formatted successfully!', 'success');
@@ -893,13 +903,13 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       const parsed = JSON.parse(text);
       // If successful, format it with the current settings
       const formatted = JSON.stringify(parsed, null, editorSettings.tabSize);
-      
+
       // Prevent the default paste
       e.preventDefault();
-      
+
       // Update the corresponding state
       setValue(formatted);
-      
+
       // Show success message
       addToast('Pasted and formatted JSON', 'success');
       return true;
@@ -980,11 +990,11 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handleFormat} 
-                  disabled={viewMode === 'diff' || isFormatting || validationStatus !== 'valid'} 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleFormat}
+                  disabled={viewMode === 'diff' || isFormatting || validationStatus !== 'valid'}
                   className="h-9 w-9 3xl:h-11 3xl:w-11 4xl:h-12 4xl:w-12 5xl:h-14 5xl:w-14 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200 text-muted-foreground"
                 >
                   {isFormatting ? (
@@ -1099,7 +1109,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
           {viewMode === 'formatted' ? (
             <div className="h-full w-full relative group">
-              <div 
+              <div
                 className="relative h-full w-full"
                 onMouseEnter={() => setIsHoveringEditor(true)}
                 onMouseLeave={() => setIsHoveringEditor(false)}
@@ -1126,7 +1136,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   onPathChange={setCurrentPath}
                   onCopyPath={(path) => toast.success(`Path copied: ${path}`)}
                 />
-                
+
                 {validationStatus === 'invalid' && canRepair && (
                   <div className="absolute bottom-4 left-4">
                     <Tooltip>
@@ -1136,15 +1146,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                           <div className="absolute inset-0 rounded-full bg-amber-500/30 animate-ping-slow" />
                           {/* Glow effect */}
                           <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-pulse-slow" />
-                          
-                          <Button 
+
+                          <Button
                             variant="default"
                             size="icon"
                             onClick={handleRepairJSON}
                             disabled={isRepairing}
-                            className={`relative z-10 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all duration-300 group w-10 h-10 rounded-xl transform hover:scale-105 ${
-                              isHoveringEditor ? 'opacity-100' : 'opacity-80'
-                            }`}
+                            className={`relative z-10 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all duration-300 group w-10 h-10 rounded-xl transform hover:scale-105 ${isHoveringEditor ? 'opacity-100' : 'opacity-80'
+                              }`}
                           >
                             {isRepairing ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -1204,6 +1213,17 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                     >
                       Diff Result
                     </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={ignoreKeyOrdering}
+                      onChange={(e) => setIgnoreKeyOrdering(e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-primary/50 text-primary focus:ring-primary accent-primary cursor-pointer"
+                      id="ignore-key-order-top"
+                    />
+                    <label htmlFor="ignore-key-order-top" className="text-xs font-medium cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors">Ignore Key Order</label>
                   </div>
                 </div>
 
@@ -1348,20 +1368,32 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   <DiffEditor
                     height="100%"
                     theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-                    original={leftInput}
-                    modified={rightInput}
+                    original={getSortedJsonForDiff(leftInput)}
+                    modified={getSortedJsonForDiff(rightInput)}
                     language="json"
                     onMount={(editor) => {
                       diffEditorRef.current = editor;
-                      setTimeout(() => {
+
+                      const updateDiffs = () => {
                         const lineChanges = editor.getLineChanges() || [];
                         setTotalDiffs(lineChanges.length);
+                      };
+
+                      // Initial check
+                      setTimeout(() => {
+                        updateDiffs();
+                        const lineChanges = editor.getLineChanges() || [];
                         if (lineChanges.length > 0) {
                           setCurrentDiffIndex(0);
                           const firstChange = lineChanges[0];
                           editor.revealLineInCenter(firstChange.originalStartLineNumber, 1);
                         }
                       }, 100);
+
+                      // Subscribe to diff updates
+                      const disposable = editor.onDidUpdateDiff(() => {
+                        updateDiffs();
+                      });
                     }}
                     options={{
                       readOnly: true,
@@ -1430,10 +1462,12 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                 <GitCompare className="w-3.5 h-3.5" />
                 {totalDiffs > 0 ? `${totalDiffs} changes` : 'No changes'}
               </div>
+
               <div className="flex items-center gap-3 3xl:gap-4 4xl:gap-5 5xl:gap-6 font-mono opacity-80">
                 <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
               </div>
             </div>
+
           ) : (
             /* Compare view - Two separate status bars */
             <div className="w-full flex items-center justify-between gap-4">
@@ -1547,12 +1581,13 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
             </div>
           ))}
         </div>
-      </div>
+      </div >
 
       {/* Download Modal */}
-      <DownloadModal
+      < DownloadModal
         isOpen={isDownloadModalOpen}
-        onClose={() => setIsDownloadModalOpen(false)}
+        onClose={() => setIsDownloadModalOpen(false)
+        }
         onDownload={handleDownloadWithFormat}
         defaultFilename={`formatted_${Date.now()}`}
       />

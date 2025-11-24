@@ -71,6 +71,41 @@ export function minifyJSON(data: any): string {
 /**
  * Convert JSON to a tree structure for collapsible display
  */
+/**
+ * Sorts all keys in a JSON object recursively
+ */
+export function sortJSONKeys(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sortJSONKeys(item));
+  }
+
+  const sortedObj: Record<string, any> = {};
+  Object.keys(obj).sort().forEach(key => {
+    sortedObj[key] = sortJSONKeys(obj[key]);
+  });
+  
+  return sortedObj;
+}
+
+/**
+ * Format JSON with sorted keys and proper indentation
+ */
+export function formatJSONWithSortedKeys(data: any, indent: number = 2): string {
+  try {
+    const sortedData = sortJSONKeys(data);
+    return JSON.stringify(sortedData, null, indent);
+  } catch (error) {
+    throw new Error('Cannot format: ' + (error as Error).message);
+  }
+}
+
+/**
+ * Convert JSON to a tree structure for collapsible display
+ */
 export function convertToTree(data: any, path: string = ''): JSONNode[] {
   const nodes: JSONNode[] = [];
 
