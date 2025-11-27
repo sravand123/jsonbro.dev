@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
 import Editor, { OnMount, OnChange } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 
-// Track if we've already registered the completion provider
+// Track if we've already registered the providers
 let isCompletionProviderRegistered = false;
+let isHoverProviderRegistered = false;
+let isCopyCommandRegistered = false;
 
 interface MonacoJSONEditorProps {
   value: string;
@@ -16,7 +18,8 @@ interface MonacoJSONEditorProps {
   onCopyPath?: (path: string) => void;
 }
 
-import { getJSONPathAtPosition } from '../utils/jsonUtils';
+import { getJSONPathAtPosition, copyToClipboard } from '../utils/jsonUtils';
+import { toast } from 'sonner';
 
 export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor | null, MonacoJSONEditorProps>((
   { value, onChange, theme, height = '400px', options = {}, onMount, onPathChange, onCopyPath }, ref
@@ -704,6 +707,74 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       });
     }
 
+    // Register global command for copying path
+    if (!isCopyCommandRegistered) {
+      isCopyCommandRegistered = true;
+      
+      monaco.editor.registerCommand('json-copy-path-command', async (_, path: string, uri: string, hoverId: string) => {
+        if (!path) return;
+        
+        try {
+          await copyToClipboard(path);
+          
+          // Truncate path for toast if too long
+          const maxToastLength = 30;
+          const displayPath = path.length > maxToastLength 
+            ? `${path.substring(0, maxToastLength)}...` 
+            : path;
+            
+          toast.success(`Path copied: ${displayPath}`);
+          
+          // Find and focus the editor
+          const editor = monaco.editor.getEditors().find(e => 
+            e.getModel()?.uri.toString() === uri || e.hasTextFocus()
+          );
+          
+          if (editor) {
+            editor.focus();
+            onCopyPath?.(path);
+          }
+        } catch (error) {
+          console.error('Error copying path:', error);
+          toast.error('Failed to copy path');
+        }
+      });
+    }
+
+    // Register hover provider
+    if (!isHoverProviderRegistered) {
+      isHoverProviderRegistered = true;
+      
+      // Add global style for hiding hovers
+
+
+      monaco.languages.registerHoverProvider('json', {
+        provideHover: (model, position) => {
+          const offset = model.getOffsetAt(position);
+          const path = getJSONPathAtPosition(model.getValue(), offset);
+
+          if (!path) return null;
+
+          const uri = model.uri.toString();
+          const hoverId = `hover-${Date.now()}`; // Unique ID for this hover instance
+            
+          return {
+            contents: [
+              { 
+                value: `**Path:** \`${path}\``,
+                supportHtml: true
+              },
+              {
+                value: `[Copy Path](command:json-copy-path-command?${encodeURIComponent(JSON.stringify([path, uri, hoverId]))} 'Copy path to clipboard')`,
+                isTrusted: true,
+                supportHtml: true
+              }
+            ]
+          };
+        }
+      });
+    }
+
     // Configure JSON language features - Disable schema suggestions
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
       validate: true,
@@ -786,35 +857,14 @@ export const MonacoJSONEditor = forwardRef<monaco.editor.IStandaloneCodeEditor |
       suggestOnTriggerCharacters: true,
       acceptSuggestionOnCommitCharacter: true,
       acceptSuggestionOnEnter: 'on',
-      tabCompletion: 'on'
-    });
-
-    // Add "Copy JSON Path" context menu action
-    editor.addAction({
-      id: 'json-copy-path',
-      label: 'Copy JSON Path',
-      contextMenuGroupId: 'navigation',
-      contextMenuOrder: 1.5,
-      run: (ed) => {
-        const position = ed.getPosition();
-        const model = ed.getModel();
-        if (position && model) {
-          const offset = model.getOffsetAt(position);
-          const value = model.getValue();
-          const path = getJSONPathAtPosition(value, offset);
-
-          if (path) {
-            navigator.clipboard.writeText(path).then(() => {
-              if (onCopyPath) {
-                onCopyPath(path);
-              }
-            }).catch(err => {
-              console.error('Failed to copy path:', err);
-            });
-          }
-        }
+      tabCompletion: 'on',
+      hover: {
+        delay: 1000,
+        enabled: true
       }
     });
+
+    // Removed 'Copy JSON Path' context menu action as requested
   };
 
   const responsiveFontSize = typeof window !== 'undefined'

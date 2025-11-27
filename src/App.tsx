@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { JSONViewer } from './components/JSONViewer';
+import { Toaster } from 'sonner';
 import './App.css';
 
 function App() {
@@ -8,7 +9,7 @@ function App() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
-    
+
     if (savedTheme === 'dark' || (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
@@ -18,7 +19,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    
+
     if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
@@ -30,6 +31,7 @@ function App() {
   return (
     <div className="min-h-screen">
       <JSONViewer theme={theme} setTheme={setTheme} />
+      <Toaster richColors theme={theme === 'dark' ? 'dark' : 'light'} />
     </div>
   );
 }

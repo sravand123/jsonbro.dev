@@ -59,11 +59,7 @@ interface JSONViewerProps {
   setTheme?: (theme: string) => void;
 }
 
-interface Toast {
-  id: string;
-  message: string;
-  type: 'success' | 'error' | 'info';
-}
+
 
 export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) {
   // State initialization with defaults
@@ -89,7 +85,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<JSONNode[]>([]);
   const [activeSearchResult, setActiveSearchResult] = useState<number | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+
   const [editorInstance, setEditorInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [viewMode, setViewMode] = useState<'formatted' | 'diff'>('formatted');
   const [isFormatting, setIsFormatting] = useState(false);
@@ -285,13 +281,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     };
   }, [input, leftInput, rightInput, viewMode, setCanRepair, setCanRepairLeft, setCanRepairRight]);
 
-  const addToast = useCallback((message: string, type: Toast['type']) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(toast => toast.id !== id));
-    }, 3000);
-  }, []);
+
 
   // Handle diff navigation
   const navigateDiff = useCallback((direction: 'next' | 'previous') => {
@@ -461,7 +451,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
   const handleFormat = useCallback(() => {
     if (!input.trim()) {
-      addToast('No JSON to format', 'error');
+      toast.error('No JSON to format');
       return;
     }
 
@@ -471,7 +461,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       const { data, error: parseError } = parseJSONSafe(input);
       if (parseError) {
         // Show error but preserve original content - don't modify editor
-        addToast('Invalid JSON syntax - Please check your syntax and try again', 'error');
+        toast.error('Invalid JSON syntax - Please check your syntax and try again');
         return;
       }
 
@@ -491,17 +481,17 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         }
       }, 0);
 
-      addToast('JSON formatted successfully', 'success');
+      toast.success('JSON formatted successfully');
     } catch (err) {
-      addToast('Failed to format JSON', 'error');
+      toast.error('Failed to format JSON');
     } finally {
       setIsFormatting(false);
     }
-  }, [input, addToast, editorSettings.tabSize]);
+  }, [input, editorSettings.tabSize]);
 
   const handleMinify = useCallback(() => {
     if (!input.trim()) {
-      addToast('No JSON to minify', 'error');
+      toast.error('No JSON to minify');
       return;
     }
 
@@ -511,7 +501,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       const { data, error: parseError } = parseJSONSafe(input);
       if (parseError) {
         // Show error but preserve original content - don't modify editor
-        addToast('Invalid JSON syntax - Please check your syntax and try again', 'error');
+        toast.error('Invalid JSON syntax - Please check your syntax and try again');
         return;
       }
 
@@ -531,34 +521,34 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         }
       }, 50);
 
-      addToast('JSON minified successfully', 'success');
+      toast.success('JSON minified successfully');
     } catch (err) {
-      addToast('Failed to minify JSON', 'error');
+      toast.error('Failed to minify JSON');
     } finally {
       setIsFormatting(false);
     }
-  }, [input, addToast]);
+  }, [input]);
 
   const handleCopy = useCallback(async () => {
     if (!input.trim()) {
-      addToast('No JSON to copy', 'error');
+      toast.error('No JSON to copy');
       return;
     }
 
     // Validate before copying - only show error if invalid
     const { data, error: parseError } = parseJSONSafe(input);
     if (parseError) {
-      addToast('Invalid JSON - Cannot copy invalid syntax', 'error');
+      toast.error('Invalid JSON - Cannot copy invalid syntax');
       return;
     }
 
     const success = await copyToClipboard(input);
     if (success) {
-      addToast('JSON copied to clipboard', 'success');
+      toast.success('JSON copied to clipboard');
     } else {
-      addToast('Failed to copy JSON', 'error');
+      toast.error('Failed to copy JSON');
     }
-  }, [input, addToast]);
+  }, [input]);
 
   const handleClear = useCallback(() => {
     if (viewMode === 'diff') {
@@ -567,7 +557,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       if (showDiff) {
         setShowDiff(false);
       }
-      addToast('Both editors cleared', 'info');
+      if (showDiff) {
+        setShowDiff(false);
+      }
+      toast.info('Both editors cleared');
     } else {
       setInput('');
       setSearchTerm('');
@@ -575,31 +568,31 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       if (typeof window !== 'undefined') {
         del('json-viewer-input').catch(err => console.error('Failed to clear input:', err));
       }
-      addToast('JSON cleared', 'info');
+      toast.info('JSON cleared');
     }
-  }, [viewMode, showDiff, addToast]);
+  }, [viewMode, showDiff]);
 
   const handleDownload = useCallback(() => {
     if (!input.trim()) {
-      addToast('No JSON to download', 'error');
+      toast.error('No JSON to download');
       return;
     }
 
     // Validate before downloading - only show error if invalid
     const { data, error: parseError } = parseJSONSafe(input);
     if (parseError) {
-      addToast('Invalid JSON - Cannot download invalid syntax', 'error');
+      toast.error('Invalid JSON - Cannot download invalid syntax');
       return;
     }
 
     // Open the modal instead of downloading directly
     setIsDownloadModalOpen(true);
-  }, [input, addToast]);
+  }, [input]);
 
   const handleDownloadWithFormat = useCallback((filename: string, format: 'json' | 'csv') => {
     const { data, error: parseError } = parseJSONSafe(input);
     if (parseError) {
-      addToast('Invalid JSON - Cannot download invalid syntax', 'error');
+      toast.error('Invalid JSON - Cannot download invalid syntax');
       return;
     }
 
@@ -608,15 +601,15 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     if (format === 'csv') {
       try {
         downloadCSV(input, fullFilename);
-        addToast('CSV downloaded', 'success');
+        toast.success('CSV downloaded');
       } catch (err) {
-        addToast('Failed to convert to CSV - Data must be an array or object', 'error');
+        toast.error('Failed to convert to CSV - Data must be an array or object');
       }
     } else {
       downloadJSON(input, fullFilename);
-      addToast('JSON downloaded', 'success');
+      toast.success('JSON downloaded');
     }
-  }, [input, addToast]);
+  }, [input]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -634,7 +627,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
     const isCSV = fileName.endsWith('.csv');
 
     if (!isJSON && !isCSV) {
-      addToast('Please select a JSON or CSV file', 'error');
+      toast.error('Please select a JSON or CSV file');
       return;
     }
 
@@ -654,18 +647,19 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       }
 
       if (parseError) {
-        addToast(`Invalid ${isCSV ? 'CSV' : 'JSON'} file: ` + parseError.message, 'error');
+        toast.error(`Invalid ${isCSV ? 'CSV' : 'JSON'} file: ` + parseError.message);
         return;
       }
 
       setInput(JSON.stringify(data, null, 2));
-      addToast(`Loaded ${file.name}${isCSV ? ' and converted to JSON' : ''}`, 'success');
+      setInput(JSON.stringify(data, null, 2));
+      toast.success(`Loaded ${file.name}${isCSV ? ' and converted to JSON' : ''}`);
     } catch (err) {
-      addToast('Failed to load file', 'error');
+      toast.error('Failed to load file');
     } finally {
       setIsLoading(false);
     }
-  }, [addToast, setIsLoading]);
+  }, [setIsLoading]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -791,10 +785,12 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         const newValue = JSON.stringify(edit.updated_src, null, 2);
         setInput(newValue);
         setValidationStatus('valid');
-        addToast('Property added', 'success');
+        setInput(newValue);
+        setValidationStatus('valid');
+        toast.success('Property added');
       }
     } catch (err) {
-      addToast('Failed to apply addition', 'error');
+      toast.error('Failed to apply addition');
     }
   };
 
@@ -804,10 +800,10 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         const newValue = JSON.stringify(edit.updated_src, null, 2);
         setInput(newValue);
         setValidationStatus('valid');
-        addToast('Property updated', 'success');
+        toast.success('Property updated');
       }
     } catch (err) {
-      addToast('Failed to apply edit', 'error');
+      toast.error('Failed to apply edit');
     }
   };
 
@@ -817,7 +813,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
         const newValue = JSON.stringify(edit.updated_src, null, 2);
         setInput(newValue);
         setValidationStatus('valid');
-        addToast('Property deleted', 'success');
+        toast.success('Property deleted');
       }
     } catch (err) {
     }
@@ -837,14 +833,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
       const formatted = formatJSON(data, editorSettings.tabSize);
       setInput(formatted);
-      addToast('JSON repaired and formatted successfully!', 'success');
+      toast.success('JSON repaired and formatted successfully!');
     } catch (error) {
       console.error('Error repairing JSON:', error);
-      addToast('Failed to repair JSON: ' + (error as Error).message, 'error');
+      toast.error('Failed to repair JSON: ' + (error as Error).message);
     } finally {
       setIsRepairing(false);
     }
-  }, [input, editorSettings.tabSize, addToast]);
+  }, [input, editorSettings.tabSize]);
 
   const handleRepairLeftJSON = useCallback(() => {
     if (leftInput.trim() === '') return;
@@ -860,14 +856,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
       const formatted = formatJSON(data, editorSettings.tabSize);
       setLeftInput(formatted);
-      addToast('Left JSON repaired and formatted successfully!', 'success');
+      toast.success('Left JSON repaired and formatted successfully!');
     } catch (error) {
       console.error('Error repairing left JSON:', error);
-      addToast('Failed to repair left JSON: ' + (error as Error).message, 'error');
+      toast.error('Failed to repair left JSON: ' + (error as Error).message);
     } finally {
       setIsLeftRepairing(false);
     }
-  }, [leftInput, editorSettings.tabSize, addToast]);
+  }, [leftInput, editorSettings.tabSize]);
 
   const handleRepairRightJSON = useCallback(() => {
     if (rightInput.trim() === '') return;
@@ -883,14 +879,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
 
       const formatted = formatJSON(data, editorSettings.tabSize);
       setRightInput(formatted);
-      addToast('Right JSON repaired and formatted successfully!', 'success');
+      toast.success('Right JSON repaired and formatted successfully!');
     } catch (error) {
       console.error('Error repairing right JSON:', error);
-      addToast('Failed to repair right JSON: ' + (error as Error).message, 'error');
+      toast.error('Failed to repair right JSON: ' + (error as Error).message);
     } finally {
       setIsRightRepairing(false);
     }
-  }, [rightInput, editorSettings.tabSize, addToast]);
+  }, [rightInput, editorSettings.tabSize]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent, setValue: (value: string) => void) => {
     if (!e.clipboardData) return;
@@ -911,14 +907,14 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
       setValue(formatted);
 
       // Show success message
-      addToast('Pasted and formatted JSON', 'success');
+      toast.success('Pasted and formatted JSON');
       return true;
     } catch (err) {
       // If not valid JSON, let the default paste behavior happen
       console.log('Pasted text is not valid JSON, using default paste behavior');
       return false;
     }
-  }, [addToast, editorSettings.tabSize]);
+  }, [editorSettings.tabSize]);
 
   const handleLeftPaste = useCallback((e: React.ClipboardEvent) => {
     handlePaste(e, setLeftInput);
@@ -1134,7 +1130,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
                   }}
                   onMount={handleEditorDidMount}
                   onPathChange={setCurrentPath}
-                  onCopyPath={(path) => toast.success(`Path copied: ${path}`)}
+                  onCopyPath={() => {}} // Handled in MonacoJSONEditor
                 />
 
                 {validationStatus === 'invalid' && canRepair && (
@@ -1562,25 +1558,7 @@ export function JSONViewer({ theme = 'light', setTheme }: JSONViewerProps = {}) 
           )}
         </footer>
 
-        {/* Toasts */}
-        <div className="fixed bottom-12 3xl:bottom-14 4xl:bottom-16 5xl:bottom-20 right-6 3xl:right-8 4xl:right-12 5xl:right-16 flex flex-col gap-2 3xl:gap-3 4xl:gap-4 5xl:gap-5 z-50 pointer-events-none">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={`p-3 3xl:p-4 4xl:p-5 5xl:p-6 rounded-lg border shadow-lg min-w-[300px] 3xl:min-w-[350px] 4xl:min-w-[400px] 5xl:min-w-[450px] animate-in slide-in-from-bottom-2 pointer-events-auto flex items-center gap-3 ${toast.type === 'success'
-                ? 'bg-background border-green-500/20 text-green-500'
-                : toast.type === 'error'
-                  ? 'bg-background border-destructive/20 text-destructive'
-                  : 'bg-background border-border text-foreground'
-                }`}
-            >
-              {toast.type === 'success' && <CheckCircle className="h-4 w-4 3xl:h-5 3xl:w-5 4xl:h-6 4xl:w-6 5xl:h-7 5xl:w-7" />}
-              {toast.type === 'error' && <AlertCircle className="h-4 w-4 3xl:h-5 3xl:w-5 4xl:h-6 4xl:w-6 5xl:h-7 5xl:w-7" />}
-              {toast.type === 'info' && <FileText className="h-4 w-4 3xl:h-5 3xl:w-5 4xl:h-6 4xl:w-6 5xl:h-7 5xl:w-7" />}
-              <span className="text-sm 3xl:text-base 4xl:text-lg 5xl:text-xl font-medium">{toast.message}</span>
-            </div>
-          ))}
-        </div>
+
       </div >
 
       {/* Download Modal */}
