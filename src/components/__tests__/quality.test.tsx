@@ -75,7 +75,9 @@ describe('accessibility', () => {
     const editor = await screen.findByLabelText('JSON editor')
     await user.clear(editor)
     await user.paste("{'bad': 1}")
-    await screen.findByRole('alert')
+    // The error is reported in the status bar; wait for it before auditing.
+    await screen.findByText('Invalid JSON')
+    await screen.findByTitle(/double quotes/i, {}, { timeout: 3000 })
 
     expect(await auditAccessibility(container)).toEqual([])
   })

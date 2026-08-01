@@ -158,6 +158,16 @@ module.exports = {
 					from: { opacity: '0', transform: 'translateY(6px)' },
 					to: { opacity: '1', transform: 'translateY(0)' },
 				},
+				/*
+				  A single glow that draws the eye to a control which has just appeared, then
+				  stops. Deliberately not a loop: a document is invalid for most of the time you
+				  are typing in it, so a pulsing button would be permanently competing with the
+				  code for attention. Rings rather than movement, so nothing shifts position.
+				*/
+				attention: {
+					'0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--warning) / 0)' },
+					'50%': { boxShadow: '0 0 0 0.3rem hsl(var(--warning) / 0.35)' },
+				},
 				'slide-down': {
 					from: { opacity: '0', transform: 'translateY(-6px)' },
 					to: { opacity: '1', transform: 'translateY(0)' },
@@ -190,6 +200,7 @@ module.exports = {
 				'scale-in': 'scale-in var(--duration-normal) var(--ease-out)',
 				'dialog-in': 'dialog-in var(--duration-normal) var(--ease-out)',
 				'slide-in-right': 'slide-in-right var(--duration-normal) var(--ease-out)',
+				attention: 'attention 900ms var(--ease-out) 2',
 			},
 		},
 	},

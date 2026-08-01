@@ -11,7 +11,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { ErrorBanner } from '@/components/editor/ErrorBanner'
 import {
   JsonEditor,
   type EditorHighlight,
@@ -423,23 +422,6 @@ export function CompareWorkspace({
             </div>
           )}
 
-          {doc.analysis.error && (side === 'left' ? leftSettled : rightSettled) && (
-            <ErrorBanner
-              key={doc.analysis.error.friendly}
-              error={doc.analysis.error}
-              canRepair={doc.analysis.canRepair}
-              repairing={doc.busy === 'repair'}
-              repairProbeSkipped={doc.analysis.repairProbeSkipped}
-              onJumpToError={() =>
-                doc.analysis.error?.line &&
-                handle.current?.revealPosition(
-                  doc.analysis.error.line,
-                  doc.analysis.error.column ?? 1,
-                )
-              }
-              onRepair={() => void doc.apply('repair')}
-            />
-          )}
         </div>
 
         <div className="flex h-[1.375rem] shrink-0 items-center border-t bg-surface px-2.5 text-2xs">
@@ -450,6 +432,12 @@ export function CompareWorkspace({
             path={cursor.path}
             onCopyPath={onCopyPath}
             compact
+            errorDetail={side === 'left' ? leftSettled : rightSettled}
+            onJumpToError={() => {
+              const error = doc.analysis.error
+              if (!error?.line) return
+              handle.current?.revealPosition(error.line, error.column ?? 1)
+            }}
           />
         </div>
       </section>

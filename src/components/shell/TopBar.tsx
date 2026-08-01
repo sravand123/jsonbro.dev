@@ -18,6 +18,7 @@ import {
   Sun,
   Terminal,
   Upload,
+  Wand2,
 } from 'lucide-react'
 
 import { GitHubStars } from '@/components/GitHubStars'
@@ -105,6 +106,18 @@ export function TopBar({
   busy,
 }: Props) {
   const format = pickCommand(commands, 'transform.format')
+  const repair = pickCommand(commands, 'transform.repair')
+  /*
+    The primary slot offers repair whenever a fix is available, and formatting otherwise.
+
+    Formatting cannot succeed on a document that does not parse — it reports "fix the syntax
+    errors first" — so "Format" is dead weight in precisely the state where repair is the
+    thing you want. Repair used to live only in the palette, the overflow menu and behind a
+    hover on the inline error report, which made the app's most useful recovery action its
+    least discoverable one.
+  */
+  const isRepair = repair?.enabled === true
+  const primary = isRepair ? repair : format
   // On small screens the icon row collapses, so those actions must also be here.
   const overflowIds = [
     'document.copy',
@@ -180,20 +193,38 @@ export function TopBar({
       </button>
 
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-        {format && (
+        {primary && (
           <Button
+            /*
+              Remounting on the swap restarts the attention animation, so the cue plays each
+              time a fix becomes available rather than only on first render.
+            */
+            key={isRepair ? 'repair' : 'format'}
             size="sm"
-            className="h-11 gap-1.5 px-3 text-xs md:h-7 md:px-2.5"
-            onClick={() => void format.run()}
-            disabled={format.enabled === false}
-            aria-label="Format document"
+            className={cn(
+              'h-11 gap-1.5 px-3 text-xs md:h-7 md:px-2.5',
+              // Repair is tinted as a warning: it appears because something is wrong, and it
+              // rewrites the document rather than just reflowing it. The glow runs twice and
+              // stops — see the `attention` keyframe for why it is not a loop.
+              isRepair && 'animate-attention bg-warning text-warning-foreground hover:bg-warning/90',
+            )}
+            onClick={() => void primary.run()}
+            disabled={primary.enabled === false}
+            aria-label={isRepair ? 'Repair invalid JSON' : 'Format document'}
+            title={
+              isRepair
+                ? 'This document has a problem that can be fixed automatically'
+                : undefined
+            }
           >
             {busy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : isRepair ? (
+              <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
             ) : (
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             )}
-            <span className="hidden sm:inline">Format</span>
+            <span className="hidden sm:inline">{isRepair ? 'Repair' : 'Format'}</span>
           </Button>
         )}
 

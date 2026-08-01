@@ -29,7 +29,6 @@ import { toast } from 'sonner'
 
 import type { ComparePane, CompareOptions } from '@/components/compare/CompareWorkspace'
 import { DuplicateKeyNotice } from '@/components/editor/DuplicateKeyNotice'
-import { ErrorBanner } from '@/components/editor/ErrorBanner'
 import type { JsonEditorHandle } from '@/components/editor/JsonEditor'
 import { Inspector } from '@/components/inspector/Inspector'
 import { QueryPanel } from '@/components/inspector/QueryPanel'
@@ -1108,24 +1107,6 @@ export function JsonBroApp() {
                   <DuplicateKeyNotice keys={doc.analysis.duplicateKeys} />
                 )}
 
-                {doc.analysis.error && typingSettled && (
-                  <ErrorBanner
-                    key={doc.analysis.error.friendly}
-                    error={doc.analysis.error}
-                    canRepair={doc.analysis.canRepair}
-                    repairing={doc.busy === 'repair'}
-                    repairProbeSkipped={doc.analysis.repairProbeSkipped}
-                    onJumpToError={goToError}
-                    onRepair={() =>
-                      void runTransform(doc, 'repair', {
-                        empty: 'Nothing to repair yet',
-                        success: 'Repaired and formatted',
-                        failure: 'Could not repair this document',
-                      })
-                    }
-                  />
-                )}
-
                 {showEmptyState && (
                   <EmptyState
                     onPaste={pasteFromClipboard}
@@ -1300,6 +1281,8 @@ export function JsonBroApp() {
               cursor={workspace === 'editor' ? { line: cursor.line, column: cursor.column } : undefined}
               path={cursor.path}
               onCopyPath={copyPath}
+              errorDetail={typingSettled}
+              onJumpToError={goToError}
             />
           )}
           <span className="hidden shrink-0 items-center gap-1 sm:flex">

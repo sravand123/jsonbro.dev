@@ -118,20 +118,23 @@ describe('document lifecycle', () => {
     expect(await screen.findByText('Invalid JSON')).toBeInTheDocument()
   })
 
-  it('explains errors inline with a jump action and a repair offer', async () => {
+  it('reports errors in the status bar and offers repair in the toolbar', async () => {
     const user = userEvent.setup()
     render(<JsonBroApp />)
 
     await typeInEditor(user, "{'a': 1}")
 
-    // The report is a compact chip that waits for a pause in typing.
-    const alert = await screen.findByRole('alert', {}, { timeout: 3000 })
-    expect(alert).toHaveTextContent(/double quotes/i)
-    // The chip names the location and doubles as the jump action.
-    expect(within(alert).getByRole('button', { name: /line \d+/ })).toBeInTheDocument()
-    expect(within(alert).getByRole('button', { name: 'Dismiss this message' })).toBeInTheDocument()
+    /*
+      The problem is reported in the status bar rather than floating over the code, and the
+      explanation appears once typing settles. Repair is a toolbar action: it changes the
+      document, so it belongs where the other document actions are.
+    */
+    expect(await screen.findByText('Invalid JSON')).toBeInTheDocument()
+    const report = await screen.findByTitle(/double quotes/i, {}, { timeout: 3000 })
+    expect(report).toHaveTextContent(/line \d+/)
+    expect(report).toHaveTextContent(/double quotes/i)
 
-    await user.click(within(alert).getByRole('button', { name: /^Fix$/ }))
+    await user.click(await screen.findByRole('button', { name: 'Repair invalid JSON' }))
     await waitFor(() =>
       expect((screen.getByLabelText('JSON editor') as HTMLTextAreaElement).value).toBe(
         '{\n  "a": 1\n}',

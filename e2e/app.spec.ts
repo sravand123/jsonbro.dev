@@ -52,9 +52,22 @@ async function focusEditor(page: Page, nth = 0) {
   await editor.click({ position: { x: 150, y: 10 } })
 }
 
+/**
+ * Monaco's idea of the platform modifier, which is not necessarily the host's.
+ *
+ * `devices['Desktop Chrome']` sends a Windows user agent even on macOS, and Monaco resolves
+ * its own `CtrlCmd` bindings from that string — so select-all inside the editor is Ctrl+A
+ * here while the app's shortcuts still answer to Meta. Getting this wrong is silent: the
+ * selection simply does not happen and the next keystrokes append to the old document.
+ */
+async function monacoModifier(page: Page) {
+  return page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.userAgent) ? 'Meta' : 'Control'))
+}
+
 async function setDocument(page: Page, value: string, nth = 0) {
   await focusEditor(page, nth)
-  await page.keyboard.press(`${MOD}+a`)
+  const mod = await monacoModifier(page)
+  await page.keyboard.press(`${mod}+a`)
   await page.keyboard.press('Delete')
   await page.keyboard.type(value)
   await expect(page.locator('.view-line').first()).not.toHaveText('')
@@ -137,56 +150,52 @@ test.describe('editor workspace', () => {
     await expect(page.locator('.view-line').first()).toContainText('{"b":[1,2],"a":"x"}')
   })
 
-  test('surfaces a friendly error, jumps to it, and repairs it', async ({ page }) => {
+  test('reports a friendly error in the status bar and jumps to it', async ({ page }) => {
     await fresh(page)
     await setDocument(page, "{'a': 1,}")
 
-    // sonner also renders live regions, so target the editor's error report.
-    const alert = page.getByRole('alert').filter({ hasText: 'quotes' })
-    await expect(alert).toContainText(/quotes/i)
+    /*
+      The report lives in the status bar: always visible, never covering the code it
+      describes. Earlier versions floated a panel over the editor, which had to be shrunk
+      twice and still sat on top of the lines in question.
+    */
+    const report = page.locator('footer button[title*="go to line"]')
+    await expect(report).toBeVisible()
+    await expect(report).toContainText('Invalid JSON')
+    await expect(report).toContainText(/line \d+/)
 
-    // At rest the report is a chip naming the line; details and actions appear on hover.
-    const chip = alert.getByRole('button', { name: /line \d+/ })
-    await expect(chip).toBeVisible()
-    const collapsed = await alert.boundingBox()
-    await expect(alert.getByRole('button', { name: /^Fix$/ })).toBeHidden()
+    // Nothing floats above the editor any more.
+    expect(await page.locator('.monaco-editor [role="alert"]').count()).toBe(0)
 
-    await alert.hover()
-    const fix = alert.getByRole('button', { name: /^Fix$/ })
-    await expect(fix).toBeVisible()
-    const expanded = await alert.boundingBox()
-    expect(collapsed!.width).toBeLessThan(expanded!.width / 2)
-
-    await chip.click()
-    await alert.hover()
-    await fix.click()
-
-    await expect(page.getByText('Valid JSON')).toBeVisible()
-    await expect(page.locator('.view-line').nth(1)).toContainText('"a"')
+    await report.click()
+    await expect(page.locator('footer')).toContainText('Ln 1')
   })
 
-  test('the error hover explains the problem without offering to peek at it', async ({
-    page,
-  }) => {
+  test('the toolbar offers repair while a fix is available', async ({ page }) => {
     await fresh(page)
-    await setDocument(page, '{\n  "tags": ["fast" "local"]\n}')
 
-    const squiggle = page.locator('.squiggly-error').first()
-    await expect(squiggle).toBeVisible()
-    const box = (await squiggle.boundingBox())!
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    /*
+      Formatting cannot succeed on a document that does not parse, so the primary slot
+      offers the action that can: repair. This used to live only in the palette, the
+      overflow menu and behind a hover, which made the recovery action hard to find at the
+      moment it was needed.
+    */
+    const format = page.getByRole('button', { name: 'Format document' })
+    const repair = page.getByRole('button', { name: 'Repair invalid JSON' })
 
-    const hover = page.locator('.monaco-hover').filter({ hasText: 'Missing comma' })
-    await expect(hover).toBeVisible()
-    // The explanation stays; Monaco's action strip, whose "View Problem" opened a peek
-    // panel that pushed the document down to repeat this very message, does not.
-    await expect(hover.locator('.hover-row.status-bar')).toBeHidden()
+    await setDocument(page, '{"a": 1}')
+    await expect(format).toBeVisible()
+    await expect(repair).toHaveCount(0)
 
-    const before = await page.locator('.view-line').last().boundingBox()
-    await page.keyboard.press('F8')
-    await page.keyboard.press('Alt+F8')
-    await expect(page.locator('.zone-widget')).toHaveCount(0)
-    expect((await page.locator('.view-line').last().boundingBox())!.y).toBe(before!.y)
+    await setDocument(page, "{'a': 1,}")
+    await expect(repair).toBeVisible()
+    await expect(format).toHaveCount(0)
+
+    await repair.click()
+    await expect(page.getByText('Valid JSON')).toBeVisible()
+    // Once repaired, the slot goes back to the everyday action.
+    await expect(format).toBeVisible()
+    await expect(repair).toHaveCount(0)
   })
 
   test('reports the JSON path of the caret', async ({ page }) => {
@@ -644,18 +653,29 @@ test.describe('layout stability', () => {
     expect(heights.size).toBe(1)
   })
 
-  test('the error report floats over the editor', async ({ page }) => {
+  test('reporting an error neither resizes nor covers the editor', async ({ page }) => {
     await fresh(page)
+
+    /*
+      The invariant this protects has outlived three designs of the report: a full-width bar
+      in the layout that resized the editor on every keystroke, a floating pill on top of the
+      code, and now a line in the status bar. Whatever the presentation, becoming invalid
+      must not move the code or sit on it.
+    */
+    await setDocument(page, '{"a": 1}')
+    await expect(page.getByText('Valid JSON')).toBeVisible()
+    const editor = page.locator('[data-testid="json-editor"]')
+    const before = await editor.boundingBox()
+
     await setDocument(page, "{'a': 1}")
+    await expect(page.locator('footer button[title*="go to line"]')).toBeVisible({
+      timeout: 5000,
+    })
 
-    const banner = page.getByRole('alert').filter({ hasText: 'quotes' })
-    await expect(banner).toBeVisible({ timeout: 5000 })
-
-    const bannerBox = await banner.boundingBox()
-    const editorBox = await page.locator('[data-testid="json-editor"]').boundingBox()
-    // It overlaps the editor rather than pushing it aside.
-    expect(bannerBox!.y).toBeGreaterThan(editorBox!.y)
-    expect(bannerBox!.y).toBeLessThan(editorBox!.y + editorBox!.height)
+    const after = await editor.boundingBox()
+    expect(Math.round(after!.height)).toBe(Math.round(before!.height))
+    expect(Math.round(after!.y)).toBe(Math.round(before!.y))
+    expect(await page.locator('.monaco-editor [role="alert"]').count()).toBe(0)
   })
 })
 

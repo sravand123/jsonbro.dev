@@ -74,10 +74,11 @@ opposite position on both counts:
   return `12345678901234567000`.
 - **Automatic repair** of trailing commas, single quotes, unquoted keys, comments and
   smart quotes, offered inline when the document is invalid.
-- **Plain-language diagnostics.** The parse error is translated, given a line, and shown as a
-  chip in the corner of the editor that expands on hover. It waits for a pause in typing
-  before appearing, because a document is transiently invalid the whole time you are editing
-  it.
+- **Plain-language diagnostics.** The parse error is translated and reported in the status
+  bar — "Invalid JSON · line 3 · Missing comma between array items" — where it is always
+  visible and never covers the code. Click it to jump there. "Invalid JSON" appears
+  immediately; the line and the explanation wait for a pause in typing, because a document is
+  transiently invalid the whole time you are editing it.
 - **Duplicate key detection.** JSON that parses successfully while silently discarding data
   is flagged explicitly.
 - **Clear with undo**, and restore of the previous document after a destructive action.
@@ -223,7 +224,7 @@ pnpm vitest run src/lib               # one directory of unit tests
 src/
   components/
     JsonBroApp.tsx      app shell: state, command registry, layout
-    editor/             Monaco host, inline error report, duplicate-key notice
+    editor/             Monaco host, duplicate-key notice
     tree/               virtualised tree browser
     compare/            diff workspace
     inspector/          search, query and statistics panels
@@ -261,9 +262,9 @@ keystroke → useJsonDocument (debounced)
               │                                     search · query · repair probe
               │◄──────────── result (sequence-guarded) ─────────────┘
               │
-              ├─ Monaco markers (squiggle, error line, gutter)
-              ├─ ErrorBanner (after typing settles)
-              ├─ StatusBar (validity, size, caret path)
+              ├─ Monaco markers (squiggle, red line number, ruler)
+              ├─ StatusBar (validity, error and line, size, caret path)
+              ├─ TopBar (primary action becomes Repair when a fix exists)
               └─ IndexedDB (persistence)
 ```
 
@@ -317,7 +318,9 @@ pin down subtle behaviour that broke once already:
 - the caret survives Compare's edit ⇄ diff switch;
 - the editor gutter does not shift between edit and diff, at any interface scale;
 - app shortcuts are not swallowed by Monaco, and Monaco's are not triggered by the app;
-- the error hover explains the problem without offering a peek panel that moves the code.
+- the error hover explains the problem without offering a peek panel that moves the code;
+- reporting an error neither resizes the editor nor covers it, through three redesigns of
+  the report.
 
 ## Performance and bundle budget
 

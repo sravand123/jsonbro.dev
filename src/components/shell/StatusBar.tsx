@@ -7,7 +7,31 @@ import { breadcrumbFor } from '@/lib/path'
 import { cn } from '@/lib/utils'
 import type { AnalyzeResult } from '@/workers/protocol'
 
-function ValidityChip({ analysis, analyzing }: { analysis: AnalyzeResult; analyzing: boolean }) {
+/**
+ * Document validity, and — when it is invalid — what is wrong and where.
+ *
+ * This is where a code editor reports problems: always visible, costing no space over the
+ * code, and never moving. Earlier versions floated a panel above the editor instead, which
+ * covered the very lines it was describing and had to be shrunk twice before it stopped
+ * being a nuisance. The repair action lives in the top bar, where actions live.
+ *
+ * "Invalid JSON" appears the moment analysis says so, but the line and the explanation wait
+ * for a pause in typing: a document is invalid for most of the time you are editing it, and
+ * a message rewriting itself on every keystroke is noise in the corner of your eye.
+ */
+function ValidityChip({
+  analysis,
+  analyzing,
+  detail,
+  onJumpToError,
+  compact,
+}: {
+  analysis: AnalyzeResult
+  analyzing: boolean
+  detail: boolean
+  onJumpToError?: () => void
+  compact: boolean
+}) {
   if (analyzing) {
     return (
       <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -27,11 +51,43 @@ function ValidityChip({ analysis, analyzing }: { analysis: AnalyzeResult; analyz
   }
 
   if (analysis.status === 'invalid') {
+    const error = analysis.error
+    const line = detail && typeof error?.line === 'number' ? error.line : null
+    const canJump = Boolean(onJumpToError && line !== null)
+
+    const body = (
+      <>
+        <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+        <span className="shrink-0">Invalid JSON</span>
+        {line !== null && (
+          <span className="shrink-0 font-mono text-muted-foreground">line {line}</span>
+        )}
+        {detail && error && !compact && (
+          <span className="hidden min-w-0 max-w-[28rem] truncate text-muted-foreground lg:inline">
+            {error.friendly}
+          </span>
+        )}
+        {detail && analysis.repairProbeSkipped && !compact && (
+          <span className="hidden shrink-0 text-muted-foreground xl:inline">
+            too large to auto-fix
+          </span>
+        )}
+      </>
+    )
+
+    if (!canJump) {
+      return <span className="flex min-w-0 items-center gap-1.5 text-destructive">{body}</span>
+    }
+
     return (
-      <span className="flex items-center gap-1.5 text-destructive">
-        <AlertCircle className="h-3 w-3" aria-hidden="true" />
-        Invalid JSON
-      </span>
+      <button
+        type="button"
+        onClick={onJumpToError}
+        title={`${error?.friendly ?? 'Invalid JSON'} — go to line ${line}`}
+        className="flex min-w-0 items-center gap-1.5 rounded px-1 text-destructive transition-colors hover:bg-destructive/10"
+      >
+        {body}
+      </button>
     )
   }
 
@@ -51,6 +107,9 @@ interface PaneStatusProps {
   path?: string
   onCopyPath?: (path: string) => void
   compact?: boolean
+  /** False while the user is still typing, so the error detail can hold still. */
+  errorDetail?: boolean
+  onJumpToError?: () => void
 }
 
 export function PaneStatus({
@@ -61,6 +120,8 @@ export function PaneStatus({
   path,
   onCopyPath,
   compact = false,
+  errorDetail = false,
+  onJumpToError,
 }: PaneStatusProps) {
   const crumbs = useMemo(() => (path ? breadcrumbFor(path) : []), [path])
   const showPath = crumbs.length > 1 && !compact
@@ -76,7 +137,13 @@ export function PaneStatus({
         </>
       )}
 
-      <ValidityChip analysis={analysis} analyzing={analyzing} />
+      <ValidityChip
+        analysis={analysis}
+        analyzing={analyzing}
+        detail={errorDetail}
+        onJumpToError={onJumpToError}
+        compact={compact}
+      />
 
       {showPath && (
         <>
