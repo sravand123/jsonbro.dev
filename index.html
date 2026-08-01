@@ -3,39 +3,111 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="A powerful JSON viewer, formatter, and validator. Easily format, validate, and work with JSON data in a clean, intuitive interface." />
-  <meta name="keywords" content="JSON, formatter, validator, viewer, JSON beautifier, JSON minifier, JSON parser, JSON editor" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description"
+    content="A fast, keyboard-first JSON editor: format, validate, repair, search, query with JSONPath, browse as a tree, and diff two documents. Runs entirely in your browser." />
   <meta name="author" content="JsonBro.Dev" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://jsonbro.dev" />
-  
+  <!-- Must match the sitemap entry exactly, trailing slash included. -->
+  <link rel="canonical" href="https://jsonbro.dev/" />
+
+  <!-- Fonts are served from this origin, so preload rather than preconnect elsewhere. -->
+  <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/jetbrains-mono-variable.woff2" as="font" type="font/woff2"
+    crossorigin />
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://jsonbro.dev" />
-  <meta property="og:title" content="JsonBro.Dev - Online JSON Viewer, Formatter & Validator" />
-  <meta property="og:description" content="A powerful JSON viewer, formatter, and validator. Easily format, validate, and work with JSON data in a clean, intuitive interface." />
+  <meta property="og:title" content="JsonBro.Dev - JSON editor, formatter, validator & diff" />
+  <meta property="og:description"
+    content="A fast, keyboard-first JSON editor: format, validate, repair, search, query with JSONPath, browse as a tree, and diff two documents. Runs entirely in your browser." />
   <meta property="og:image" content="https://jsonbro.dev/og-image.jpg" />
   <meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="JsonBro.Dev - JSON Viewer, Formatter & Validator" />
-  
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="JsonBro.Dev - JSON editor, formatter and validator" />
+
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://jsonbro.dev" />
-  <meta name="twitter:title" content="JsonBro.Dev - Online JSON Viewer, Formatter & Validator" />
-  <meta name="twitter:description" content="A powerful JSON viewer, formatter, and validator. Easily format, validate, and work with JSON data in a clean, intuitive interface." />
+  <meta name="twitter:title" content="JsonBro.Dev - JSON editor, formatter, validator & diff" />
+  <meta name="twitter:description"
+    content="A fast, keyboard-first JSON editor: format, validate, repair, search, query with JSONPath, browse as a tree, and diff two documents. Runs entirely in your browser." />
   <meta name="twitter:image" content="https://jsonbro.dev/og-image.jpg" />
-  
-  <!-- Favicon -->
+
+  <!-- Favicon + platform chrome -->
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <meta name="theme-color" content="#22c55e" />
-  
-  <title>JsonBro.Dev - Online JSON Viewer, Formatter & Validator</title>
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0b0f16" media="(prefers-color-scheme: dark)" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="JsonBro" />
+
+  <title>JsonBro.Dev - JSON editor, formatter, validator & diff</title>
+
+  <!--
+    Structured data. Describes the app to search engines and answer surfaces: a free
+    developer tool that runs in the browser. Keep `featureList` in step with the app —
+    stale claims here are worse than none.
+  -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "JsonBro",
+    "url": "https://jsonbro.dev/",
+    "applicationCategory": "DeveloperApplication",
+    "applicationSubCategory": "JSON editor",
+    "operatingSystem": "Any browser",
+    "description": "Keyboard-first JSON editor, formatter, validator, tree browser and diff tool. Formats without losing large-number precision, explains parse errors in plain language, and runs entirely client-side.",
+    "browserRequirements": "Requires JavaScript, Web Workers and IndexedDB",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "Format and minify JSON without losing large-number precision",
+      "Validate JSON with plain-language error messages",
+      "Repair invalid JSON automatically",
+      "Browse JSON as a virtualised tree",
+      "Compare two JSON documents side by side",
+      "Query JSON with JSONPath expressions",
+      "Search keys and values at any depth",
+      "Convert between JSON and CSV"
+    ],
+    "author": {
+      "@type": "Person",
+      "name": "Sravan Kumar Dasari"
+    },
+    "license": "https://opensource.org/licenses/MIT"
+  }
+  </script>
+
+  <script>
+    // Apply the saved theme before first paint so the app never flashes the wrong
+    // colour scheme. The React theme hook takes over from here.
+    (function () {
+      try {
+        var stored = localStorage.getItem('theme') || 'dark'
+        var dark =
+          stored === 'dark' ||
+          (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+      } catch (error) {
+        document.documentElement.classList.add('dark')
+      }
+    })()
+  </script>
 </head>
 
 <body>
   <div id="root"></div>
+  <noscript>
+    JsonBro.dev is a browser-based JSON editor and needs JavaScript enabled.
+  </noscript>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

@@ -1,55 +1,83 @@
-import { useState, useEffect } from 'react';
-import { Star, Github } from 'lucide-react';
+import { Github, Star } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
-const GITHUB_REPO_URL = 'https://github.com/sravand123/jsonbro.dev';
+const GITHUB_REPO_URL = 'https://github.com/sravand123/jsonbro.dev'
+const GITHUB_API_URL = 'https://api.github.com/repos/sravand123/jsonbro.dev'
+const CACHE_KEY = 'jsonbro:github-stars'
+const CACHE_TTL = 24 * 60 * 60 * 1000
 
+interface CachedStars {
+  count: number
+  fetchedAt: number
+}
+
+function readCache(): CachedStars | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CachedStars
+    if (Date.now() - parsed.fetchedAt > CACHE_TTL) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Star count badge.
+ *
+ * The count is cached for a day, so a normal session makes no third-party request
+ * at all. A blocked, offline or rate-limited request is an expected condition, not
+ * an error: the count is simply omitted. It used to log to the console, which
+ * polluted the console for anyone offline or behind a content blocker.
+ */
 export function GitHubStars() {
-  const [stars, setStars] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [stars, setStars] = useState<number | null>(() => readCache()?.count ?? null)
 
   useEffect(() => {
-    const fetchStars = async () => {
+    if (readCache()) return
+    const controller = new AbortController()
+
+    void (async () => {
       try {
-        const response = await fetch('https://api.github.com/repos/sravand123/jsonbro.dev');
-        if (!response.ok) {
-          throw new Error('Failed to fetch GitHub stars');
+        const response = await fetch(GITHUB_API_URL, { signal: controller.signal })
+        if (!response.ok) return
+        const data = (await response.json()) as { stargazers_count?: number }
+        if (typeof data.stargazers_count !== 'number') return
+        setStars(data.stargazers_count)
+        try {
+          localStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({ count: data.stargazers_count, fetchedAt: Date.now() }),
+          )
+        } catch {
+          // Storage unavailable; the count just will not be cached.
         }
-        const data = await response.json();
-        setStars(data.stargazers_count);
-      } catch (err) {
-        console.error('Error fetching GitHub stars:', err);
-        setError('Failed to load star count');
-      } finally {
-        setIsLoading(false);
+      } catch {
+        // Offline, rate limited, or blocked — show the link without a count.
       }
-    };
+    })()
 
-    fetchStars();
-  }, []);
-
-  if (error) {
-    return null; // Don't show anything if there's an error
-  }
+    return () => controller.abort()
+  }, [])
 
   return (
     <a
       href={GITHUB_REPO_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-1.5 3xl:gap-2 4xl:gap-2.5 5xl:gap-3 px-2.5 3xl:px-3 4xl:px-3.5 5xl:px-4 py-1.5 3xl:py-2 4xl:py-2.5 5xl:py-3 text-sm 3xl:text-base 4xl:text-lg 5xl:text-xl text-muted-foreground transition-all duration-200 rounded-lg hover:bg-emerald-50/80 dark:hover:bg-emerald-900/30 group border border-border/40 hover:border-emerald-200 dark:hover:border-emerald-800 shadow-sm hover:shadow-md"
-      title="Star us on GitHub"
+      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 px-2 text-2xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
     >
-      <Github className="h-4 w-4 3xl:h-5 3xl:w-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7 group-hover:scale-110 transition-transform duration-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
-      <div className="h-4 3xl:h-5 4xl:h-6 5xl:h-7 w-px bg-border/50 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700 transition-colors duration-200" />
-      <div className="flex items-center gap-1 3xl:gap-1.5 4xl:gap-2 5xl:gap-2.5">
-        <Star className="h-4 w-4 3xl:h-5 3xl:w-5 4xl:w-6 4xl:h-6 5xl:w-7 5xl:h-7 fill-current group-hover:fill-emerald-500 group-hover:text-emerald-500 dark:group-hover:fill-emerald-400 dark:group-hover:text-emerald-400 transition-all duration-200 group-hover:scale-110" />
-        {!isLoading && stars !== null && (
-          <span className="text-xs 3xl:text-sm 4xl:text-base 5xl:text-lg font-medium group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors duration-200">
+      <Github className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="sr-only">Star jsonbro.dev on GitHub</span>
+      {stars !== null && (
+        <>
+          <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+          <span className="tabular-nums" aria-label={`${stars} stars on GitHub`}>
             {stars.toLocaleString()}
           </span>
-        )}
-      </div>
+        </>
+      )}
     </a>
-  );
+  )
 }

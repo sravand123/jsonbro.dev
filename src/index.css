@@ -1,115 +1,376 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/*
+  Self-hosted fonts.
+
+  These used to be an `@import` of a Google Fonts stylesheet, which is the slowest
+  possible arrangement: the browser cannot discover it until this file has downloaded,
+  then it has to connect to two more hosts before any text can render in its real
+  typeface. It also meant every visit contacted Google, which is hard to square with a
+  tool that promises nothing leaves your machine.
+
+  Both are variable fonts, so one file per family covers every weight the interface uses
+  — 77 kB total, against 278 kB for the seven static files it replaced.
+*/
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-variable.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-variable.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Token layer.
+
+  Every UI colour is an HSL triplet consumed as hsl(var(--token)) so that opacity
+  modifiers (bg-primary/10) work. JSON syntax colours are mirrored in
+  src/lib/monaco/theme.ts, which needs hex values for Monaco's theme API.
+*/
 @layer base {
   :root {
+    /* Surfaces */
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --surface: 210 20% 98%;
+    --surface-raised: 0 0% 100%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Text */
+    --foreground: 222 47% 11%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 14% 40%;
+    --accent: 210 20% 94%;
+    --accent-foreground: 222 47% 11%;
+
+    /* Brand */
+    --primary: 142 72% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    /* Lines + focus */
+    --border: 214 22% 90%;
+    --input: 214 22% 88%;
+    --ring: 142 72% 36%;
+
+    /* Status */
+    --success: 142 72% 34%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 40%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 217 91% 48%;
+    --info-foreground: 0 0% 100%;
+
+    /* Diff */
+    --diff-added: 142 72% 34%;
+    --diff-removed: 0 72% 48%;
+
+    /* JSON syntax (mirrored in src/lib/monaco/theme.ts) */
+    --json-key: 212 92% 35%;
+    --json-string: 152 68% 27%;
+    --json-number: 27 88% 37%;
+    --json-boolean: 265 62% 43%;
+    --json-null: 220 9% 46%;
+    --json-punctuation: 220 12% 40%;
+
     --radius: 0.5rem;
 
-    /* Fluid responsive variables */
-    --fluid-base-size: clamp(0.875rem, 0.8rem + 0.25vw, 1.2rem);
-    --fluid-icon-size: clamp(1rem, 0.95rem + 0.25vw, 1.5rem);
-    --fluid-header-height: clamp(3.5rem, 3.2rem + 1vw, 5.5rem);
-    --fluid-footer-height: clamp(2rem, 1.8rem + 0.5vw, 3rem);
-    --fluid-padding: clamp(1rem, 0.9rem + 0.5vw, 2rem);
-    --fluid-gap: clamp(0.5rem, 0.45rem + 0.25vw, 1rem);
+    /* Motion — a single scale so nothing feels ad hoc */
+    --duration-instant: 90ms;
+    --duration-fast: 150ms;
+    --duration-normal: 220ms;
+    --duration-slow: 320ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /*
+      Layout metrics used by the shell.
+
+      Sized for developer density rather than marketing-site comfort: a 14" laptop
+      should show as much JSON as possible, and the numbers are fixed rather than
+      viewport-scaled so the interface has the same proportions on every display.
+    */
+    --topbar-height: 2.75rem;
+    --statusbar-height: 1.5rem;
+    --rail-width: 2.75rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 220 26% 6%;
+    --surface: 217 26% 9%;
+    --surface-raised: 218 24% 12%;
+    --card: 217 26% 9%;
+    --card-foreground: 213 33% 93%;
+    --popover: 218 24% 11%;
+    --popover-foreground: 213 33% 93%;
+
+    --foreground: 213 33% 93%;
+    --muted: 216 22% 13%;
+    --muted-foreground: 214 16% 66%;
+    --accent: 217 23% 16%;
+    --accent-foreground: 213 33% 93%;
+
+    --primary: 142 69% 48%;
+    --primary-foreground: 144 61% 6%;
+    --secondary: 216 22% 15%;
+    --secondary-foreground: 213 33% 93%;
+
+    --border: 215 20% 18%;
+    --input: 215 20% 20%;
+    --ring: 142 69% 48%;
+
+    --success: 142 69% 48%;
+    --success-foreground: 144 61% 6%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 26 83% 8%;
+    --destructive: 0 84% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 213 94% 68%;
+    --info-foreground: 222 47% 11%;
+
+    --diff-added: 142 69% 45%;
+    --diff-removed: 0 84% 62%;
+
+    --json-key: 212 100% 74%;
+    --json-string: 130 66% 70%;
+    --json-number: 27 100% 67%;
+    --json-boolean: 265 89% 83%;
+    --json-null: 215 14% 65%;
+    --json-punctuation: 215 12% 55%;
   }
 }
 
 @layer base {
+  /*
+    One knob for the whole interface, and it is a ratio.
+
+    Every non-editor size — type, control heights, gutters, panel widths — is in rem,
+    and the editor's font, padding and the tree's row height are derived from the same
+    root value in JS. So this single declaration sets the scale of everything.
+
+    The root is a fixed *proportion* of viewport width (1.05vw), anchored so that a
+    1512px-wide laptop lands on exactly 16px. That proportion is the point: an earlier
+    version grew sub-linearly (1.06% of width on a laptop, 0.57% at 4582px), which is
+    why the interface kept looking undersized as displays got larger. Holding the ratio
+    constant means the layout looks the same at any width — just bigger — and browser
+    zoom becomes visually neutral rather than progressively shrinking the app.
+
+      zoom 150% ->  1008px -> 11px      zoom  67% -> 2257px -> 23.7px
+      zoom 125% ->  1210px -> 12.7px    zoom  50% -> 3024px -> 31.8px
+      zoom 100% ->  1512px -> 15.9px    zoom  33% -> 4582px -> 48.1px
+      zoom  80% ->  1890px -> 19.8px    zoom  25% -> 6048px -> 63.5px
+
+    The bounds are deliberately wide so the ratio holds across every zoom level a
+    browser offers: the 72px ceiling only engages past ~6900px, and the 11px floor only
+    below ~1050px. Because zoom multiplies CSS pixels, holding the ratio through the
+    zoomed-in range keeps the app's *physical* size roughly constant — 125% and 150%
+    look like the baseline rather than a magnified version of it.
+
+    Touch devices keep a 16px floor of their own so tap targets never shrink.
+
+    Anyone who wants denser code regardless of display can pin an exact editor font
+    size in Settings, which bypasses the derived value entirely.
+  */
+  html {
+    font-size: clamp(11px, 1.05vw, 72px);
+  }
+
+  @media (pointer: coarse) {
+    html {
+      font-size: clamp(16px, 1.05vw, 46px);
+    }
+  }
+
   * {
     @apply border-border;
   }
 
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   body {
-    @apply bg-background text-foreground;
-    font-size: var(--fluid-base-size);
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  /*
+    Fallback focus ring for interactive elements that do not style focus
+    themselves (custom buttons, tree rows, breadcrumb segments).
+
+    Form fields are excluded deliberately: Input styles its own focus, and a ring
+    on a full-width borderless field — the command palette's input — is clipped by
+    the dialog's rounded, overflow-hidden container and reads as a stray green
+    line rather than a ring. Those fields show focus through their caret and, where
+    they have a border, their own ring.
+  */
+  :focus-visible:not(input):not(textarea):not(select):not([data-slot='control']) {
+    @apply outline-none ring-2 ring-ring ring-offset-1 ring-offset-background;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply outline-none;
+  }
+
+  ::selection {
+    @apply bg-primary/25;
   }
 }
 
-/* Custom scrollbar styles */
+@layer components {
+  /* Keyboard shortcut chip */
+  .kbd {
+    @apply inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded border border-border/80
+      bg-muted px-1.5 font-mono text-3xs font-medium leading-none text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 0.625rem;
+  height: 0.625rem;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-muted;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full;
+  @apply rounded-full border-[0.1875rem] border-solid border-transparent bg-muted-foreground/25 bg-clip-padding;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/40;
+  @apply bg-muted-foreground/45;
 }
 
-/* Animation for toast notifications */
-@keyframes slide-in-from-bottom-2 {
-  from {
-    transform: translateY(8px);
-    opacity: 0;
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/*
+  Monaco gutter, scaled with the interface.
+
+  Monaco sizes its gutter codicons from the editor font but keeps the folding column
+  at a fixed 22px, so on a large display the chevron grew past its box and overlapped
+  the line numbers. Pinning both the glyph and its box to the same rem value keeps them
+  in proportion, and the small left inset gives the digits room to breathe instead of
+  sitting flush against the editor's edge.
+*/
+/*
+  Monaco already scales the gutter glyph with the editor font, but it sizes the control's
+  box inline from `lineDecorationsWidth`. Centring the glyph inside that box stops it
+  spilling over the line numbers when the interface is scaled up.
+*/
+.monaco-editor .margin-view-overlays .cldr.codicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Monaco needs to inherit our font stack and stay out of its own way. */
+.monaco-editor,
+.monaco-editor .margin,
+.monaco-editor-background {
+  background-color: transparent !important;
+}
+
+.monaco-editor .scroll-decoration {
+  box-shadow: none !important;
+}
+
+/* Search highlight decorations applied from the editor host. */
+.jb-search-match {
+  background-color: hsl(var(--warning) / 0.28);
+  border-radius: 2px;
+}
+
+.jb-search-match-active {
+  background-color: hsl(var(--warning) / 0.55);
+  border-radius: 2px;
+  outline: 1px solid hsl(var(--warning));
+}
+
+.jb-error-line {
+  background-color: hsl(var(--destructive) / 0.12);
+}
+
+.jb-error-line-number {
+  color: hsl(var(--destructive)) !important;
+  font-weight: 600;
+}
+
+/*
+  Monaco's hover action strip.
+
+  On an error it offers "View Problem", which opens a peek panel that pushes the whole
+  document down in order to repeat the message printed directly above it, plus a
+  "No quick fixes available" note for a feature this editor does not have. The hover keeps
+  the part that matters — the explanation — and the inline report handles jumping and
+  repairing. Hiding the strip also keeps the card short enough not to cover the code it
+  describes. Our own "Copy path" link lives in the hover contents, so it is unaffected.
+
+  Not scoped under `.monaco-editor`: overflowing content widgets are appended to the body,
+  so the hover is not a descendant of the editor at all. `!important` because Monaco
+  injects its own stylesheet at runtime, which therefore comes after this one.
+*/
+.monaco-hover .hover-row.status-bar {
+  display: none !important;
+}
+
+/*
+  Respect the OS motion preference.
+
+  Reduced motion means "no movement", not "no feedback": transform-based motion and
+  looping animations are removed, while colour and opacity transitions are kept
+  short so the interface still responds visibly to input. If your animations look
+  dead, check System Settings → Accessibility → Display → Reduce motion.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-property: opacity, color, background-color, border-color, fill, stroke !important;
+    transition-duration: 100ms !important;
   }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.animate-in {
-  animation: slide-in-from-bottom-2 0.2s ease-out;
-}
-
-/* Selection styles */
-::selection {
-  @apply bg-primary/20;
-}
-
-.dark ::selection {
-  @apply bg-primary/40;
 }
