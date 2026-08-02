@@ -1,5 +1,4 @@
 import {
-  Braces,
   ChevronDown,
   Copy,
   Download,
@@ -32,6 +31,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Logo } from '@/components/ui/Logo'
 import { Kbd, Segmented } from '@/components/ui/primitives'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { pickCommand, type Command } from '@/lib/commands'
@@ -145,7 +145,7 @@ export function TopBar({
         className="flex shrink-0 items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-accent/60"
         aria-label="JsonBro.dev home"
       >
-        <Braces className="h-[1.125rem] w-[1.125rem] text-primary" aria-hidden="true" />
+        <Logo className="h-[1.6rem] w-[1.5rem]" />
         <span className="hidden text-sm font-semibold tracking-tight sm:inline">JsonBro</span>
       </a>
 

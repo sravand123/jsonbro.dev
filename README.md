@@ -308,7 +308,7 @@ Decisions worth knowing before changing things:
 | Accessibility | `axe-core` | Automated audit of the rendered app, asserted at zero violations |
 | End-to-end | Playwright (Chromium) | Two projects — desktop 1440×900 and Pixel 5. Every workspace, shortcut isolation, layout stability, gutter alignment |
 
-Current state: **156 unit, component and integration tests; 62 end-to-end tests**; clean
+Current state: **162 unit, component and integration tests; 76 end-to-end tests**; clean
 typecheck; no lint errors.
 
 Bug fixes are expected to arrive with a regression test. A number of tests exist purely to
@@ -341,7 +341,7 @@ Production build (`pnpm build`), measured:
 | `CompareWorkspace` | 12 kB | 4 kB | Entering Compare |
 | `parsers` — CSV | 45 kB | 16 kB | On CSV import/export |
 
-Roughly **153 kB gzipped** of JavaScript is needed for an interactive shell; Monaco is the
+Roughly **145 kB gzipped** of JavaScript is needed for an interactive shell; Monaco is the
 overwhelming majority of the bundle and never blocks first paint.
 
 Large documents are handled with explicit budgets rather than optimism:
